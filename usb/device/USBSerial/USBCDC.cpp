@@ -214,9 +214,10 @@ void USBCDC::callback_request(const setup_packet_t *setup)
     RequestResult result = PassThrough;
     uint8_t *data = NULL;
     uint32_t size = 0;
-
+//   printf("@@ USB CB REQ\n");
     /* Only process class-specific requests */
     if (setup->bmRequestType.Type == CLASS_TYPE) {
+//    	printf("@@ USB CB REQ TP %d\n",setup->bRequest);
         switch (setup->bRequest) {
             case CDC_GET_LINE_CODING:
                 result = Send;
@@ -237,6 +238,7 @@ void USBCDC::callback_request(const setup_packet_t *setup)
                 result = Success;
                 break;
             default:
+ //           	printf("failed REQ type %d\n",setup->bRequest);
                 result = Failure;
                 break;
         }
@@ -254,7 +256,7 @@ void USBCDC::callback_request_xfer_done(const setup_packet_t *setup, bool aborte
         complete_request_xfer_done(false);
         return;
     }
-
+ //   printf("@@ USB CB REQ DONE\n");
     bool success = false;
 
     /* Process class-specific requests */
@@ -278,7 +280,7 @@ void USBCDC::callback_request_xfer_done(const setup_packet_t *setup, bool aborte
             success = true;
         }
     }
-
+ //   printf("@@ USB CB REQ DE ENd\n");
     complete_request_xfer_done(success);
 }
 
@@ -286,7 +288,7 @@ void USBCDC::callback_set_configuration(uint8_t configuration)
 {
     assert_locked();
     /* Called in ISR context */
-
+ //   printf("@@ USB CB SET CFG\n");
     bool ret = false;
     if (configuration == DEFAULT_CONFIGURATION) {
         // Configure endpoints > 0
@@ -307,6 +309,7 @@ void USBCDC::callback_set_interface(uint16_t interface, uint8_t alternate)
 {
     assert_locked();
     complete_set_interface(true);
+  //  printf("@@ USB CB SET INTF\n");
 }
 
 void USBCDC::_change_terminal_connected(bool connected)

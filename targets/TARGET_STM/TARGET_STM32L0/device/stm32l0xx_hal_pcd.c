@@ -1226,7 +1226,7 @@ static HAL_StatusTypeDef PCD_EP_ISR_Handler(PCD_HandleTypeDef *hpcd)
   {
     /* extract highest priority endpoint number */
     EPindex = (uint8_t)(wIstr & USB_ISTR_EP_ID);
-    
+//    printf("@@@ ISR %d\n",EPindex);
     if (EPindex == 0U)
     {
       /* Decode and service control endpoint interrupt */
@@ -1243,7 +1243,7 @@ static HAL_StatusTypeDef PCD_EP_ISR_Handler(PCD_HandleTypeDef *hpcd)
         
         ep->xfer_count = PCD_GET_EP_TX_CNT(hpcd->Instance, ep->num);
         ep->xfer_buff += ep->xfer_count;
- 
+ //       printf("ISR-0\n");
         /* TX COMPLETE */
         HAL_PCD_DataInStageCallback(hpcd, 0U);
         
@@ -1272,6 +1272,8 @@ static HAL_StatusTypeDef PCD_EP_ISR_Handler(PCD_HandleTypeDef *hpcd)
           /* SETUP bit kept frozen while CTR_RX = 1*/ 
           PCD_CLEAR_RX_EP_CTR(hpcd->Instance, PCD_ENDP0); 
           
+//          printf("@@@ PMA ADDR %x\n",ep->pmaadress);
+//          printf("ISR-1\n");
           /* Process SETUP Packet*/
           HAL_PCD_SetupStageCallback(hpcd);
         }

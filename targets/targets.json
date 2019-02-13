@@ -3102,7 +3102,7 @@
             "MBED_TICKLESS"
         ],
         "overrides": { "lpticker_delay_ticks": 4 },
-        "detect_code": ["0760"],
+        "detect_code": ["0760"],	        		
         "device_has_add": [
             "ANALOGOUT",
             "CRC",
@@ -3110,7 +3110,8 @@
             "SERIAL_ASYNCH",
             "TRNG",
             "FLASH",
-            "MPU"
+            "MPU",
+			"USBDEVICE"
         ],
         "release_versions": ["2", "5"],
         "device_name": "STM32L073RZ"

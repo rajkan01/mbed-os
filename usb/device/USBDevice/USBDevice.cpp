@@ -16,6 +16,7 @@
 
 #include <stdint.h>
 #include <string.h>
+#include <stdio.h>
 
 #include "USBDevice.h"
 #include "USBDescriptor.h"
@@ -376,7 +377,7 @@ bool USBDevice::_request_set_configuration()
         _transfer.user_callback = SetConfiguration;
         callback_set_configuration(_device.configuration);
     }
-
+//    printf("@@@@ _request_set_configuration\n");
     return true;
 }
 
@@ -615,6 +616,7 @@ bool USBDevice::_request_setup()
 
     /* Process standard requests */
     if ((_transfer.setup.bmRequestType.Type == STANDARD_TYPE)) {
+//    	printf("@@@@@ setup type %d\n",_transfer.setup.bRequest);
         switch (_transfer.setup.bRequest) {
             case GET_STATUS:
                 success = _request_get_status();
@@ -651,7 +653,7 @@ bool USBDevice::_request_setup()
                 break;
         }
     }
-
+//    printf("@@@@@ setup type SUCCESS\n");
     return success;
 }
 
@@ -719,19 +721,20 @@ void USBDevice::_complete_request()
         }
         return;
     }
-
+//    printf("@@ USB CMP REQ\n");
     if (direction == PassThrough) {
         /* Standard requests */
         if (!_request_setup()) {
             _phy->ep0_stall();
             return;
         }
-
+//        printf("@@ USB CMP REQ PS\n");
         /* user_callback may be set by _request_setup() */
         if (_transfer.user_callback == None) {
             _control_setup_continue();
         }
     } else if (direction == Failure) {
+//    	printf("@@ USB CMP REQ FA\n");
         _phy->ep0_stall();
         return;
     } else {
@@ -740,6 +743,7 @@ void USBDevice::_complete_request()
         _transfer.ptr = data;
         _transfer.direction = direction;
         _control_setup_continue();
+//        printf("@@ USB CMP REQ CONT\n");
     }
 }
 
@@ -758,11 +762,13 @@ void USBDevice::_control_abort_start()
 void USBDevice::_control_setup_continue()
 {
     assert_locked();
-
+//    printf("CTR SET CON\n");
     /* Check transfer size and direction */
     if (_transfer.setup.wLength > 0) {
+
         if (_transfer.setup.bmRequestType.dataTransferDirection \
                 == Send) {
+ //       	printf("CTR SET CON\n");
             /* IN data stage is required */
             if (_transfer.direction != Send) {
                 _phy->ep0_stall();
@@ -853,7 +859,7 @@ void USBDevice::ep0_setup()
         MBED_ASSERT(0);
         return;
     }
-
+ //   printf("@@ USB EP0 STP\n");
     _setup_ready = true;
 
     /* Endpoint 0 setup event */
@@ -910,15 +916,18 @@ void USBDevice::ep0_in()
 #endif
     if (_transfer.stage == Status) {
         // No action needed on status stage
+    	//printf("ep0_in return\r\n");
         return;
     }
-
+ //   printf("ep0_in-1\r\n");
     /* Endpoint 0 IN data event */
     if (!_control_in()) {
         /* Protocol stall; this will stall both endpoints */
+//    	printf("STALL \n");
         _phy->ep0_stall();
         return;
     }
+//    printf("ep0_in-2\r\n");
 }
 
 void USBDevice::out(usb_ep_t endpoint)
@@ -963,6 +972,7 @@ void USBDevice::init()
 
     if (!_initialized) {
         this->_phy->init(this);
+ //       printf("@@@ USB Device init\n");
         _max_packet_size_ep0 = this->_phy->ep0_set_max_packet(MAX_PACKET_SIZE_EP0);
         _initialized = true;
     }
@@ -1000,7 +1010,7 @@ void USBDevice::connect()
 
     /* Ensure device has been initialized */
     init();
-
+ //   printf("@@@@ USB Connect\n");
     /* Connect device */
     if (!_connected) {
         _phy->connect();

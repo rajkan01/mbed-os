@@ -32,14 +32,19 @@
     defined(TARGET_DISCO_F769NI) || \
     defined(TARGET_DISCO_F746NG_OTG_HS)
 #define USBHAL_IRQn  OTG_HS_IRQn
+#elif defined(TARGET_NUCLEO_L073RZ)
+#define USBHAL_IRQn  USB_IRQn
 #else
 #define USBHAL_IRQn  OTG_FS_IRQn
 #endif
 
 #include "USBEndpoints_STM32.h"
-
+//#if defined(TARGET_NUCLEO_L073RZ)
+//#define NB_ENDPOINT  8 // Must be a multiple of 4 bytes
+//#else
+//#define NB_ENDPOINT  4 // Must be a multiple of 4 bytes
+//#endif
 #define NB_ENDPOINT  4 // Must be a multiple of 4 bytes
-
 #define MAXTRANSFER_SIZE  0x200
 
 #define FIFO_USB_RAM_SIZE (MAXTRANSFER_SIZE + MAX_PACKET_SIZE_EP0 + MAX_PACKET_SIZE_EP1 + MAX_PACKET_SIZE_EP2 + MAX_PACKET_SIZE_EP3)
