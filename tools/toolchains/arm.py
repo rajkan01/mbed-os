@@ -37,6 +37,12 @@ ARMC5_MIGRATION_WARNING = (
     "please visit https://os.mbed.com/docs/mbed-os/latest/tools/index.html"
 )
 
+UARM_TOOLCHAIN_WARNING = (
+    "Warning: We noticed that you are using Micro Arm Toolchain. "
+    "We are deprecating the use of Micro Arm Toolchain soon. "
+    "Please upgrade your environment to Arm Compiler 6 with Bare Metal. For more information, "
+    "please visit https://os.mbed.com/docs/mbed-os/v5.14/reference/mbed-os-bare-metal.html"    
+)
 
 class ARM(mbedToolchain):
     LINKER_EXT = '.sct'
@@ -71,7 +77,7 @@ class ARM(mbedToolchain):
             raise NotSupportedException(
                 "this compiler does not support the core %s" % target.core)
 
-        if getattr(target, "default_toolchain", "ARM") == "uARM":
+        if getattr(target, "default_toolchain", "ARM") == "uARM"  or getattr(target, "default_lib", "std") == "small":
             if "-DMBED_RTOS_SINGLE_THREAD" not in self.flags['common']:
                 self.flags['common'].append("-DMBED_RTOS_SINGLE_THREAD")
             if "-D__MICROLIB" not in self.flags['common']:
@@ -80,6 +86,9 @@ class ARM(mbedToolchain):
                 self.flags['ld'].append("--library_type=microlib")
             if "--library_type=microlib" not in self.flags['common']:
                 self.flags['common'].append("--library_type=microlib")
+
+        if getattr(target, "default_lib", "std") == "small":
+            self.flags['ld'].append("--predefine=-D__MICROLIB")
 
         cpu = {
             "Cortex-M0+": "Cortex-M0plus",
@@ -554,7 +563,7 @@ class ARMC6(ARM_STD):
                     "ARM/ARMC6 compiler support is required for ARMC6 build"
                 )
 
-        if getattr(target, "default_toolchain", "ARMC6") == "uARM":
+        if getattr(target, "default_toolchain", "ARMC6") == "uARM" or getattr(target, "default_lib", "std") == "small":
             if "-DMBED_RTOS_SINGLE_THREAD" not in self.flags['common']:
                 self.flags['common'].append("-DMBED_RTOS_SINGLE_THREAD")
             if "-D__MICROLIB" not in self.flags['common']:
@@ -567,6 +576,9 @@ class ARMC6(ARM_STD):
                 self.flags['cxx'].append("-Wl,--library_type=microlib")
             if "--library_type=microlib" not in self.flags['asm']:
                 self.flags['asm'].append("--library_type=microlib")
+
+        if getattr(target, "default_lib", "std") == "small":
+            self.flags['ld'].append("--predefine=-D__MICROLIB")
 
         if target.is_TrustZone_secure_target:
             if kwargs.get('build_dir', False):

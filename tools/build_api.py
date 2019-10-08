@@ -47,6 +47,7 @@ from .targets import TARGET_NAMES, TARGET_MAP, CORE_ARCH, Target
 from .libraries import Library
 from .toolchains import TOOLCHAIN_CLASSES, TOOLCHAIN_PATHS
 from .toolchains.arm import ARMC5_MIGRATION_WARNING
+from .toolchains.arm import UARM_TOOLCHAIN_WARNING
 from .config import Config
 
 RELEASE_VERSIONS = ['2', '5']
@@ -230,11 +231,15 @@ def find_valid_toolchain(target, toolchain):
     """
     end_warnings = []
     toolchain_names = get_valid_toolchain_names(target, toolchain)
+    if(target.default_toolchain == "uARM"):
+        end_warnings.append(UARM_TOOLCHAIN_WARNING)
     last_error = None
     for index, toolchain_name in enumerate(toolchain_names):
         internal_tc_name = get_toolchain_name(target, toolchain_name)
         if toolchain == "ARM" and toolchain_name == "ARMC5" and index != 0:
             end_warnings.append(ARMC5_MIGRATION_WARNING)
+        if toolchain_name == "uARM":
+            end_warnings.append(UARM_TOOLCHAIN_WARNING)
         if not TOOLCHAIN_CLASSES[internal_tc_name].check_executable():
             search_path = TOOLCHAIN_PATHS[internal_tc_name] or "No path set"
             last_error = (
