@@ -49,10 +49,27 @@ class GCC(mbedToolchain):
         tool_path = TOOLCHAIN_PATHS['GCC_ARM']
         # Add flags for current size setting
         default_lib = "std"
+        stdio_lib = "std"
         if hasattr(target, "default_lib"):
             default_lib = target.default_lib
         elif hasattr(target, "default_build"):
             default_lib = target.default_build
+
+        if hasattr(target, "stdio_lib"):            
+            stdio_lib = target.stdio_lib
+
+        if stdio_lib == "small":
+            self.flags["common"].append("-DMBED_MINIMAL_PRINTF")
+            self.flags["ld"].extend([
+                "-Wl,--wrap,printf", 
+                "-Wl,--wrap,sprintf",
+                "-Wl,--wrap,snprintf",
+                "-Wl,--wrap,vprintf", 
+                "-Wl,--wrap,vsprintf", 
+                "-Wl,--wrap,vsnprintf",
+                "-Wl,--wrap,fprintf", 
+                "-Wl,--wrap,vfprintf"
+             ])    
 
         if default_lib == "small":
             self.flags["common"].append("-DMBED_RTOS_SINGLE_THREAD")

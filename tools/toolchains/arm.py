@@ -80,6 +80,13 @@ class ARM(mbedToolchain):
                 self.flags['ld'].append("--library_type=microlib")
             if "--library_type=microlib" not in self.flags['common']:
                 self.flags['common'].append("--library_type=microlib")
+        
+        stdio_lib = "std"
+        if hasattr(target, "stdio_lib"):            
+            stdio_lib = target.stdio_lib
+
+        if stdio_lib == "small":
+            self.flags["common"].append("-DMBED_MINIMAL_PRINTF")
 
         cpu = {
             "Cortex-M0+": "Cortex-M0plus",
@@ -567,6 +574,13 @@ class ARMC6(ARM_STD):
                 self.flags['cxx'].append("-Wl,--library_type=microlib")
             if "--library_type=microlib" not in self.flags['asm']:
                 self.flags['asm'].append("--library_type=microlib")
+
+        stdio_lib = "std"
+        if hasattr(target, "stdio_lib"):            
+            stdio_lib = target.stdio_lib
+
+        if stdio_lib == "small":
+            self.flags["common"].append("-DMBED_MINIMAL_PRINTF")
 
         if target.is_TrustZone_secure_target:
             if kwargs.get('build_dir', False):
