@@ -103,7 +103,14 @@ static void convert_to_string(unsigned long long  value,  char str[],  radix_bas
 }
 
 //This function used to calculate the string length on format 'prefix + data + suffix'
-static int expected_string_length(char *prefix = nullptr, long long value, radix_base base, char *suffix = nullptr, bool sign = false)
+static int calculate_str_len(
+    char * str,
+    char *prefix = nullptr,
+    long long value,
+    radix_base base,
+    char *suffix = nullptr,
+    bool signed = false
+)
 {
     char *exp_str = &expected_string[0];
     int prefix_length = 0;
