@@ -48,68 +48,58 @@ using namespace utest::v1;
 //Global buffer used by test cases to store string literal
 char expected_string[MAX_STRING_SIZE];
 
-typedef enum {
-    RADIX_10,//radix base for decimal
-    RADIX_16 //radix base for Hexadecimal
-} radix_base;
+#define BASE_10 10
+#define BASE_16 16
 
 // This function is similar to itoa but it can convert any data type with decimal and hexadecimal numerical value into a string
-static void convert_to_string(unsigned long long  value,  char str[],  radix_base radix = RADIX_10, bool sign = false)
+static char *convert_to_string(
+    uint64_t  value,
+    char str[],
+    int base = BASE_10,
+    bool is_negative = false)
 {
-    char        buffer[MAX_STRING_SIZE];
-    char       *dest = buffer + sizeof(buffer);
+    int i = 0;
 
-    // If value is 0
     if (value == 0) {
-        memcpy(str, "0", 2);
-        return;
+        str[0] = '0';
+        str[1] = '\0';
+        return str;
     }
 
-    if (sign) {
-        if ((long long) value < 0) {
-            // Make value postive
-            value = -value;
-        }
-    }
-    *--dest = '\0';
-    switch (radix) {
-        case RADIX_16:
-            while (value) {
-                * --dest = '0' + (value & 0xF);
-                if (*dest > '9') {
-                    *dest += 'A' - '9' - 1;
-                }
-                value >>= 4;
-            }
-            break;
-        case RADIX_10:
-            while (value) {
-                *--dest = '0' + (value % 10);
-                value /= 10;
-            }
-            break;
-
-        default:
-            MBED_ASSERT(0);
-            break;
+    if (is_negative && ((long long) value < 0)) {
+        value = -value;
     }
 
-    if (sign) {
-        // Add the negative sign for negative numerical value
-        *--dest = '-';
+    while (value) {
+        int remainder = value % base;
+        str[i++] = (remainder > 9) ? (remainder - 10) + 'A' : remainder + '0';
+        value = value / base;
     }
-    // Copy the converted string from dest into str buffer of converted string length
-    memcpy(str, dest, buffer + sizeof(buffer) - dest);
+
+    if (is_negative) {
+        str[i++] = '-';
+    }
+
+    str[i] = '\0';
+
+    // Reverse the string
+    int start = 0;
+    int end = i - 1;
+    while (start < end) {
+        swap(*(str + start), *(str + end));
+        start++;
+        end--;
+    }
+    return str;
 }
 
 //This function used to calculate the string length on format 'prefix + data + suffix'
 static int calculate_str_len(
-    char * str,
     char *prefix = nullptr,
-    long long value,
-    radix_base base,
+    long long value = 0,
+    int base = BASE_10,
     char *suffix = nullptr,
-    bool signed = false
+    bool is_negative = false
 )
 {
     char *exp_str = &expected_string[0];
@@ -119,7 +109,7 @@ static int calculate_str_len(
         prefix_length = strlen(prefix);
         strncpy(exp_str, prefix, prefix_length);
     }
-    convert_to_string(value, &exp_str[prefix_length], base, sign);
+    convert_to_string(value, &exp_str[prefix_length], base, is_negative);
     if (suffix) {
         strcat(exp_str, suffix);
     }
@@ -152,7 +142,7 @@ static control_t test_printf_d(const size_t call_count)
     // The format specifier %hhd is not supported by Newlib-Nano
     result_baseline = printf("hhd: %hhd\r\n", SCHAR_MIN);
 #else
-    result_baseline = expected_string_length("hhd: ", SCHAR_MIN, RADIX_10, "\r\n", true);
+    result_baseline = calculate_str_len("hhd: ", SCHAR_MIN, BASE_10, "\r\n", true);
 #endif
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
@@ -163,7 +153,7 @@ static control_t test_printf_d(const size_t call_count)
     // The format specifier %hhd is not supported by Newlib-Nano
     result_baseline = printf("hhd: %hhd\r\n", SCHAR_MAX);
 #else
-    result_baseline = expected_string_length("hhd: ", SCHAR_MAX, RADIX_10, "\r\n");
+    result_baseline = calculate_str_len("hhd: ", SCHAR_MAX, BASE_10, "\r\n");
 #endif
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
@@ -210,7 +200,7 @@ static control_t test_printf_d(const size_t call_count)
     // The format specifier %lld is not supported by Newlib-Nano
     result_baseline = printf("lld: %lld\r\n", LLONG_MIN);
 #else
-    result_baseline = expected_string_length("lld: ", LLONG_MIN, RADIX_10, "\r\n", true);
+    result_baseline = calculate_str_len("lld: ", LLONG_MIN, BASE_10, "\r\n", true);
 #endif
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
@@ -221,7 +211,7 @@ static control_t test_printf_d(const size_t call_count)
     // The format specifier %lld is not supported by Newlib-Nano
     result_baseline = printf("lld: %lld\r\n", LLONG_MAX);
 #else
-    result_baseline = expected_string_length("lld: ", LLONG_MAX, RADIX_10, "\r\n");
+    result_baseline = calculate_str_len("lld: ", LLONG_MAX, BASE_10, "\r\n");
 #endif
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
@@ -291,7 +281,7 @@ static control_t test_printf_u(const size_t call_count)
     // The format specifier %hhu is not supported by Newlib-Nano
     result_baseline = printf("hhu: %hhu\r\n", 0);
 #else
-    result_baseline = expected_string_length("hhu: ", 0, RADIX_10, "\r\n");
+    result_baseline = calculate_str_len("hhu: ", 0, BASE_10, "\r\n");
 #endif
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
@@ -302,7 +292,7 @@ static control_t test_printf_u(const size_t call_count)
     // The format specifier %hhu is not supported by Newlib-Nano
     result_baseline = printf("hhu: %hhu\r\n", UCHAR_MAX);
 #else
-    result_baseline = expected_string_length("hhu: ", UCHAR_MAX, RADIX_10, "\r\n");
+    result_baseline = calculate_str_len("hhu: ", UCHAR_MAX, BASE_10, "\r\n");
 #endif
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
@@ -349,7 +339,7 @@ static control_t test_printf_u(const size_t call_count)
     // The format specifier %llu is not supported by Newlib-Nano
     result_baseline = printf("llu: %llu\r\n", 0ULL);
 #else
-    result_baseline = expected_string_length("llu: ", 0ULL, RADIX_10, "\r\n");
+    result_baseline = calculate_str_len("llu: ", 0ULL, BASE_10, "\r\n");
 #endif
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
@@ -360,7 +350,7 @@ static control_t test_printf_u(const size_t call_count)
     // The format specifier %llu is not supported by Newlib-Nano
     result_baseline = printf("llu: %llu\r\n", ULLONG_MAX);
 #else
-    result_baseline = expected_string_length("llu: ", ULLONG_MAX, RADIX_10, "\r\n");
+    result_baseline = calculate_str_len("llu: ", ULLONG_MAX, BASE_10, "\r\n");
 #endif
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
@@ -430,7 +420,7 @@ static control_t test_printf_x(const size_t call_count)
     // The format specifier %hhX is not supported by Newlib-Nano
     result_baseline = printf("hhX: %hhX\r\n", 0);
 #else
-    result_baseline = expected_string_length("hhX: ", 0, RADIX_16, "\r\n");
+    result_baseline = calculate_str_len("hhX: ", 0, BASE_16, "\r\n");
 #endif
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
@@ -441,7 +431,7 @@ static control_t test_printf_x(const size_t call_count)
     // The format specifier %hhX is not supported by Newlib-Nano
     result_baseline = printf("hhX: %hhX\r\n", UCHAR_MAX);
 #else
-    result_baseline = expected_string_length("hhX: ", UCHAR_MAX, RADIX_16, "\r\n");
+    result_baseline = calculate_str_len("hhX: ", UCHAR_MAX, BASE_16, "\r\n");
 #endif
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
@@ -488,7 +478,7 @@ static control_t test_printf_x(const size_t call_count)
     // The format specifier %llX is not supported by Newlib-Nano
     result_baseline = printf("llX: %llX\r\n", 0ULL);
 #else
-    result_baseline = expected_string_length("llX: ", 0ULL, RADIX_16, "\r\n");
+    result_baseline = calculate_str_len("llX: ", 0ULL, BASE_16, "\r\n");
 #endif
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
@@ -499,7 +489,7 @@ static control_t test_printf_x(const size_t call_count)
     // The format specifier %llX is not supported by Newlib-Nano
     result_baseline = printf("llX: %llX\r\n", ULLONG_MAX);
 #else
-    result_baseline = expected_string_length("llX: ", ULLONG_MAX, RADIX_16, "\r\n");
+    result_baseline = calculate_str_len("llX: ", ULLONG_MAX, BASE_16, "\r\n");
 #endif
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
@@ -595,7 +585,7 @@ static control_t test_snprintf_d(const size_t call_count)
     result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "hhd: %hhd\r\n", SCHAR_MIN);
     TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
 #else
-    result_baseline = expected_string_length("hhd: ", SCHAR_MIN, RADIX_10, "\r\n", true);
+    result_baseline = calculate_str_len("hhd: ", SCHAR_MIN, BASE_10, "\r\n", true);
     TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
 #endif
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
@@ -606,7 +596,7 @@ static control_t test_snprintf_d(const size_t call_count)
     result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "hhd: %hhd\r\n", SCHAR_MAX);
     TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
 #else
-    result_baseline = expected_string_length("hhd: ", SCHAR_MAX, RADIX_10, "\r\n");
+    result_baseline = calculate_str_len("hhd: ", SCHAR_MAX, BASE_10, "\r\n");
     TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
 #endif
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
@@ -647,7 +637,7 @@ static control_t test_snprintf_d(const size_t call_count)
     result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "lld: %lld\r\n", LLONG_MIN);
     TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
 #else
-    result_baseline = expected_string_length("lld: ", LLONG_MIN, RADIX_10, "\r\n", true);
+    result_baseline = calculate_str_len("lld: ", LLONG_MIN, BASE_10, "\r\n", true);
     TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
 #endif
 
@@ -659,7 +649,7 @@ static control_t test_snprintf_d(const size_t call_count)
     result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "lld: %lld\r\n", LLONG_MAX);
     TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
 #else
-    result_baseline = expected_string_length("lld: ", LLONG_MAX, RADIX_10, "\r\n");
+    result_baseline = calculate_str_len("lld: ", LLONG_MAX, BASE_10, "\r\n");
     TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
 #endif
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
@@ -724,7 +714,7 @@ static control_t test_snprintf_u(const size_t call_count)
     result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "hhu: %hhu\r\n", 0);
     TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
 #else
-    result_baseline = expected_string_length("hhu: ", 0, RADIX_10, "\r\n");
+    result_baseline = calculate_str_len("hhu: ", 0, BASE_10, "\r\n");
     TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
 #endif
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
@@ -735,7 +725,7 @@ static control_t test_snprintf_u(const size_t call_count)
     result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "hhu: %hhu\r\n", UCHAR_MAX);
     TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
 #else
-    result_baseline = expected_string_length("hhu: ", UCHAR_MAX, RADIX_10, "\r\n");
+    result_baseline = calculate_str_len("hhu: ", UCHAR_MAX, BASE_10, "\r\n");
     TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
 #endif
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
@@ -776,7 +766,7 @@ static control_t test_snprintf_u(const size_t call_count)
     result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "llu: %llu\r\n", 0ULL);
     TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
 #else
-    result_baseline = expected_string_length("llu: ", 0ULL, RADIX_10, "\r\n");
+    result_baseline = calculate_str_len("llu: ", 0ULL, BASE_10, "\r\n");
     TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
 #endif
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
@@ -787,7 +777,7 @@ static control_t test_snprintf_u(const size_t call_count)
     result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "llu: %llu\r\n", ULLONG_MAX);
     TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
 #else
-    result_baseline = expected_string_length("llu: ", ULLONG_MAX, RADIX_10, "\r\n");
+    result_baseline = calculate_str_len("llu: ", ULLONG_MAX, BASE_10, "\r\n");
     TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
 #endif
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
@@ -852,7 +842,7 @@ static control_t test_snprintf_x(const size_t call_count)
     result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "hhX: %hhX\r\n", 0);
     TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
 #else
-    result_baseline = expected_string_length("hhX: ", 0, RADIX_16, "\r\n");
+    result_baseline = calculate_str_len("hhX: ", 0, BASE_16, "\r\n");
     TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
 #endif
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
@@ -863,7 +853,7 @@ static control_t test_snprintf_x(const size_t call_count)
     result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "hhX: %hhX\r\n", UCHAR_MAX);
     TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
 #else
-    result_baseline = expected_string_length("hhX: ", UCHAR_MAX, RADIX_16, "\r\n");
+    result_baseline = calculate_str_len("hhX: ", UCHAR_MAX, BASE_16, "\r\n");
     TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
 #endif
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
@@ -903,7 +893,7 @@ static control_t test_snprintf_x(const size_t call_count)
     result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "llX: %llX\r\n", 0ULL);
     TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
 #else
-    result_baseline = expected_string_length("llX: ", 0ULL, RADIX_16, "\r\n");
+    result_baseline = calculate_str_len("llX: ", 0ULL, BASE_16, "\r\n");
     TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
 #endif
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
@@ -914,7 +904,7 @@ static control_t test_snprintf_x(const size_t call_count)
     result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "llX: %llX\r\n", ULLONG_MAX);
     TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
 #else
-    result_baseline = expected_string_length("llX: ", ULLONG_MAX, RADIX_16, "\r\n");
+    result_baseline = calculate_str_len("llX: ", ULLONG_MAX, BASE_16, "\r\n");
     TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
 #endif
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
@@ -1073,18 +1063,18 @@ static control_t test_snprintf_f(const size_t call_count)
  * Template parameters:
     * 'T' is the type being tested
     * 'buf_size' is the buffer size used in tests
-    * 'radix_base' is used when Newlib-nano non-supported printf formats to calculate expected_string_length
+    * 'base' is used when Newlib-nano non-supported printf formats to calculate calculate_str_len
   * Function parameters:
     * 'fmt' is the format to use for sprintf
     * 'data' is the data that will be printed
-    * 'sign' boolenan true for negative number,false for positive number
+    * 'is_negative' boolenan true for negative number,false for positive number
 */
 #if !defined(__NEWLIB_NANO)
 template<typename T, size_t buf_size>
 #else
-template<typename T, size_t buf_size, radix_base base = RADIX_10>
+template<typename T, size_t buf_size, int base = BASE_10>
 #endif
-static control_t test_snprintf_buffer_overflow_generic(const char *fmt, T data, bool sign = false)
+static control_t test_snprintf_buffer_overflow_generic(const char *fmt, T data, bool is_negative = false)
 {
     char buffer_baseline[buf_size];
     char buffer_minimal[buf_size];
@@ -1094,7 +1084,7 @@ static control_t test_snprintf_buffer_overflow_generic(const char *fmt, T data, 
     char prefix[buf_size];
     memset(prefix, 0, buf_size);
     extract_prefix(fmt, &prefix[0]);
-    result_baseline = expected_string_length(prefix, data, base, nullptr, sign);
+    result_baseline = calculate_str_len(prefix, data, base, nullptr, is_negative);
 #endif
     memset(buffer_baseline, 0, buf_size);
 #if !defined(__MICROLIB)
@@ -1149,17 +1139,17 @@ static control_t test_snprintf_buffer_overflow_generic(const char *fmt, T data, 
    be large enough to fit the printed data. */
 static control_t test_snprintf_buffer_overflow_d(const size_t call_count)
 {
-    return test_snprintf_buffer_overflow_generic<int, sizeof("d: -1024")>("d: %d", -1024);
+    return test_snprintf_buffer_overflow_generic<int, sizeof("d: -1024")>("d: %d", -1024, true);
 }
 
 static control_t test_snprintf_buffer_overflow_ld(const size_t call_count)
 {
-    return test_snprintf_buffer_overflow_generic<long, sizeof("ld: -1048576")>("ld: %ld", -1048576L);
+    return test_snprintf_buffer_overflow_generic<long, sizeof("ld: -1048576")>("ld: %ld", -1048576L, true);
 }
 
 static control_t test_snprintf_buffer_overflow_lld(const size_t call_count)
 {
-    return test_snprintf_buffer_overflow_generic<long long, sizeof("lld: -1099511627776")>("lld: %lld", -1099511627776LL);
+    return test_snprintf_buffer_overflow_generic<long long, sizeof("lld: -1099511627776")>("lld: %lld", -1099511627776LL, true);
 }
 
 static control_t test_snprintf_buffer_overflow_u(const size_t call_count)
@@ -1182,7 +1172,7 @@ static control_t test_snprintf_buffer_overflow_x(const size_t call_count)
 #if !defined(__NEWLIB_NANO)
     return test_snprintf_buffer_overflow_generic<unsigned int, sizeof("x: 0x400")>("x: 0x%x", 0x400);
 #else
-    return test_snprintf_buffer_overflow_generic<unsigned int, sizeof("x: 0x400"), RADIX_16>("x: 0x%x", 0x400);
+    return test_snprintf_buffer_overflow_generic<unsigned int, sizeof("x: 0x400"), BASE_16>("x: 0x%x", 0x400);
 #endif
 }
 
@@ -1191,7 +1181,7 @@ static control_t test_snprintf_buffer_overflow_lx(const size_t call_count)
 #if !defined(__NEWLIB_NANO)
     return test_snprintf_buffer_overflow_generic<unsigned long, sizeof("lx: 0x100000")>("lx: 0x%lx", 0x100000UL);
 #else
-    return test_snprintf_buffer_overflow_generic<unsigned long, sizeof("lx: 0x100000"), RADIX_16>("lx: 0x%lx", 0x100000UL);
+    return test_snprintf_buffer_overflow_generic<unsigned long, sizeof("lx: 0x100000"), BASE_16>("lx: 0x%lx", 0x100000UL);
 #endif
 }
 
@@ -1200,7 +1190,7 @@ static control_t test_snprintf_buffer_overflow_llx(const size_t call_count)
 #if !defined(__NEWLIB_NANO)
     return test_snprintf_buffer_overflow_generic<unsigned long long, sizeof("llx: 0x10000000000")>("llx: 0x%llx", 0x10000000000ULL);
 #else
-    return test_snprintf_buffer_overflow_generic<unsigned long long, sizeof("llx: 0x10000000000"), RADIX_16>("llx: 0x%llx", 0x10000000000ULL);
+    return test_snprintf_buffer_overflow_generic<unsigned long long, sizeof("llx: 0x10000000000"), BASE_16>("llx: 0x%llx", 0x10000000000ULL);
 #endif
 }
 
