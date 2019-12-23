@@ -913,7 +913,7 @@ static control_t test_printf_f(const size_t call_count)
 
 static control_t test_snprintf_f(const size_t call_count)
 {
-    char buffer_baseline[100] = {0};
+    char buffer_baseline[100];
     char buffer_minimal[100];
     int result_baseline;
     int result_minimal;
@@ -922,7 +922,7 @@ static control_t test_snprintf_f(const size_t call_count)
     /*************************************************************************/
 
     double pi = 3.14159265359;
-
+    CLEAN_BUFFER;
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "f: %f\r\n", 3.0089);
     result_baseline = sprintf(buffer_baseline, "f: 3.008900\r\n");
     TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
