@@ -52,8 +52,8 @@ static char expected_string[MAX_STRING_SIZE];
 /** This function converts an integer into a string representing the integer in base 10 or base 16.
  *
  *  @param value to be converted to a string.
- *  @param str is a array in memory where to store the resulting null-terminated string.
- *  @param base Numerical base used to represent the value as a string where BASE_10 for decimal, BASE_16 for hexadecimal.
+ *  @param str is an array where to store the resulting null-terminated string.
+ *  @param base used to represent the string.
  *
  *  @return
  *    A pointer to the resulting null-terminated string, same as parameter str.
@@ -104,12 +104,12 @@ static char *convert_to_string(
 }
 
 /** This function is using a global buffer to build the test string 'prefix + data + suffix' and
- *  return its length.
+ *  returns its length.
  *
- *  @param prefix is the format specifier string
- *  @param value to be converted to a string
- *  @param base Numerical base used to represent the value as a string where BASE_10 for decimal, BASE_16 for hexadecimal.
- *  @param suffix is the "\r\n" string
+ *  @param prefix is a null-terminated string.
+ *  @param value to be converted to a string.
+ *  @param base used to represent the string.
+ *  @param suffix is a null-terminated string.
  *  @param is_negative is used to represent a positive or negative value
  *
  *  @return
@@ -132,9 +132,9 @@ static int make_test_string(
         strncpy(exp_str, prefix, str_length);
     }
 
-    convert_to_string(value, &exp_str[str_length], base, is_negative);
-    str_length = strlen(exp_str);
+    convert_to_string(value, &exp_str[str_length], base, is_negative);    
     if (suffix) {
+        str_length = strlen(exp_str);
         MBED_ASSERT(strlen(suffix) < (MAX_STRING_SIZE - str_length));
         strncat(exp_str, suffix, str_length);
     }
@@ -144,12 +144,10 @@ static int make_test_string(
 // Extract the prefix string which is all characters until '%'.
 static void extract_prefix(const char *fmt, char *prefix = nullptr)
 {
-    char buffer[MAX_STRING_SIZE] = {0};
-    char *temp_prefix;
-    strncpy(buffer, fmt, strlen(fmt));
-    if (prefix) {
-        temp_prefix =  strtok(buffer, "%");
-        strncpy(prefix, temp_prefix, strlen(temp_prefix));
+    int i = 0;
+    while (fmt && prefix && fmt[i] != '%') {
+            prefix[i] = fmt[i];
+            i++;
     }
 }
 
@@ -162,7 +160,7 @@ static control_t test_printf_d(const size_t call_count)
     /*************************************************************************/
     /*************************************************************************/
     result_minimal = mbed_printf("hhd: %hhd\r\n", SCHAR_MIN);
-    result_file = mbed_fprintf(stderr, "hhd: %hhd\r\n", SCHAR_MIN);//test_printf
+    result_file = mbed_fprintf(stderr, "hhd: %hhd\r\n", SCHAR_MIN);
     result_baseline = make_test_string("hhd: ", SCHAR_MIN, BASE_10, "\r\n", true);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
@@ -956,7 +954,7 @@ static control_t test_snprintf_f(const size_t call_count)
   * Function parameters:
     * 'fmt' is the format to use for sprintf
     * 'data' is the data that will be printed
-    * 'is_negative' is true for negative number,false for positive number
+    * 'is_negative' is true for negative number, false for positive number
 */
 template<typename T, size_t buf_size, int base = BASE_10>
 static control_t test_snprintf_buffer_overflow_generic(const char *fmt, T data, bool is_negative = false)
@@ -966,9 +964,8 @@ static control_t test_snprintf_buffer_overflow_generic(const char *fmt, T data, 
     int result_baseline;
     int result_minimal;
     char prefix[buf_size] = { 0 };
-    // fmt string contains "format specifier: %format specifier",
-    // for long long data type fmt will be "hhd: %hhd"
-    // and below function only extracts prefix "hhd: ".
+    // fmt string has "format specifier: %format specifier" and
+    // this function extracts the string preceding the first '%'.
     extract_prefix(fmt, &prefix[0]);
     result_baseline = make_test_string(prefix, data, base, nullptr, is_negative);
 
