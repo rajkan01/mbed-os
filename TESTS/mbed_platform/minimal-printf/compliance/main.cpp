@@ -917,7 +917,7 @@ static control_t test_snprintf_f(const size_t call_count)
     char buffer_minimal[100];
     int result_baseline;
     int result_minimal;
-
+#define CLEAN_BUFFER memset(buffer_baseline, 0x00, sizeof(buffer_baseline))
     /*************************************************************************/
     /*************************************************************************/
 
@@ -927,22 +927,22 @@ static control_t test_snprintf_f(const size_t call_count)
     result_baseline = sprintf(buffer_baseline, "f: 3.008900\r\n");
     TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
-
+    CLEAN_BUFFER;
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "f: %f\r\n", 7.0);
     result_baseline = sprintf(buffer_baseline, "f: 7.000000\r\n");
     TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
-
+    CLEAN_BUFFER;
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "f: %f\r\n", -1 * pi);
     result_baseline = sprintf(buffer_baseline, "f: -3.141593\r\n");
     TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
-
+    CLEAN_BUFFER;
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "f: %f\r\n", 0.0);
     result_baseline = sprintf(buffer_baseline, "f: 0.000000\r\n");
     TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
-
+    CLEAN_BUFFER;
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "f: %f\r\n", pi);
     result_baseline = sprintf(buffer_baseline, "f: 3.141593\r\n");
     TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
