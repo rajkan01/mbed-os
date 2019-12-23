@@ -42,16 +42,22 @@
 
 using namespace utest::v1;
 
-#if defined(__NEWLIB_NANO)
-
 #define MAX_STRING_SIZE 100
-//Global buffer used by test cases to store string literal
-char expected_string[MAX_STRING_SIZE];
+// Buffer used by test cases to store a test string
+static char expected_string[MAX_STRING_SIZE];
 
 #define BASE_10 10
 #define BASE_16 16
 
-// This function is similar to itoa but it can convert any data type with decimal and hexadecimal numerical value into a string
+/** This function converts an integer into a string representing the integer in base 10 or base 16.
+ *
+ *  @param value to be converted to a string.
+ *  @param str is a array in memory where to store the resulting null-terminated string.
+ *  @param base Numerical base used to represent the value as a string where BASE_10 for decimal, BASE_16 for hexadecimal.
+ *
+ *  @return
+ *    A pointer to the resulting null-terminated string, same as parameter str.
+ */
 static char *convert_to_string(
     uint64_t  value,
     char str[],
@@ -59,6 +65,10 @@ static char *convert_to_string(
     bool is_negative = false)
 {
     int i = 0;
+
+    if (base != BASE_10 && base != BASE_16) {
+        MBED_ASSERT(0);
+    }
 
     if (value == 0) {
         str[0] = '0';
@@ -69,7 +79,7 @@ static char *convert_to_string(
     if (is_negative && ((long long) value < 0)) {
         value = -value;
     }
-
+    // Convert a value to a string stored in reverse order in memory.
     while (value) {
         int remainder = value % base;
         str[i++] = (remainder > 9) ? (remainder - 10) + 'A' : remainder + '0';
@@ -82,7 +92,7 @@ static char *convert_to_string(
 
     str[i] = '\0';
 
-    // Reverse the string
+    // Reverse the string.
     int start = 0;
     int end = i - 1;
     while (start < end) {
@@ -93,40 +103,55 @@ static char *convert_to_string(
     return str;
 }
 
-//This function used to calculate the string length on format 'prefix + data + suffix'
-static int calculate_str_len(
-    char *prefix = nullptr,
+/** This function is using a global buffer to build the test string 'prefix + data + suffix' and
+ *  return its length.
+ *
+ *  @param prefix is the format specifier string
+ *  @param value to be converted to a string
+ *  @param base Numerical base used to represent the value as a string where BASE_10 for decimal, BASE_16 for hexadecimal.
+ *  @param suffix is the "\r\n" string
+ *  @param is_negative is used to represent a positive or negative value
+ *
+ *  @return
+ *    string length
+ */
+static int make_test_string(
+    const char *prefix = nullptr,
     long long value = 0,
     int base = BASE_10,
-    char *suffix = nullptr,
+    const char *suffix = nullptr,
     bool is_negative = false
 )
 {
     char *exp_str = &expected_string[0];
-    int prefix_length = 0;
+    int str_length = 0;
     memset(exp_str, 0, MAX_STRING_SIZE);
     if (prefix) {
-        prefix_length = strlen(prefix);
-        strncpy(exp_str, prefix, prefix_length);
+        str_length = strlen(prefix);
+        MBED_ASSERT(str_length < MAX_STRING_SIZE);
+        strncpy(exp_str, prefix, str_length);
     }
-    convert_to_string(value, &exp_str[prefix_length], base, is_negative);
+
+    convert_to_string(value, &exp_str[str_length], base, is_negative);
+    str_length = strlen(exp_str);
     if (suffix) {
-        strcat(exp_str, suffix);
+        MBED_ASSERT(strlen(suffix) < (MAX_STRING_SIZE - str_length));
+        strncat(exp_str, suffix, str_length);
     }
     return strlen(exp_str);
 }
 
-//This function used to extract the prefix format from the fmt
+// Extract the prefix string which is all characters until '%'.
 static void extract_prefix(const char *fmt, char *prefix = nullptr)
 {
+    char buffer[MAX_STRING_SIZE] = {0};
     char *temp_prefix;
-    strncpy(expected_string, fmt, strlen(fmt));
+    strncpy(buffer, fmt, strlen(fmt));
     if (prefix) {
-        temp_prefix =  strtok(expected_string, "%");
+        temp_prefix =  strtok(buffer, "%");
         strncpy(prefix, temp_prefix, strlen(temp_prefix));
     }
 }
-#endif
 
 static control_t test_printf_d(const size_t call_count)
 {
@@ -137,82 +162,62 @@ static control_t test_printf_d(const size_t call_count)
     /*************************************************************************/
     /*************************************************************************/
     result_minimal = mbed_printf("hhd: %hhd\r\n", SCHAR_MIN);
-    result_file = mbed_fprintf(stderr, "hhd: %hhd\r\n", SCHAR_MIN);
-#if !defined(__NEWLIB_NANO)
-    // The format specifier %hhd is not supported by Newlib-Nano
-    result_baseline = printf("hhd: %hhd\r\n", SCHAR_MIN);
-#else
-    result_baseline = calculate_str_len("hhd: ", SCHAR_MIN, BASE_10, "\r\n", true);
-#endif
+    result_file = mbed_fprintf(stderr, "hhd: %hhd\r\n", SCHAR_MIN);//test_printf
+    result_baseline = make_test_string("hhd: ", SCHAR_MIN, BASE_10, "\r\n", true);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
 
     result_minimal = mbed_printf("hhd: %hhd\r\n", SCHAR_MAX);
     result_file = mbed_fprintf(stderr, "hhd: %hhd\r\n", SCHAR_MAX);
-#if !defined(__NEWLIB_NANO)
-    // The format specifier %hhd is not supported by Newlib-Nano
-    result_baseline = printf("hhd: %hhd\r\n", SCHAR_MAX);
-#else
-    result_baseline = calculate_str_len("hhd: ", SCHAR_MAX, BASE_10, "\r\n");
-#endif
+    result_baseline = make_test_string("hhd: ", SCHAR_MAX, BASE_10, "\r\n");
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
 
     result_minimal = mbed_printf("hd: %hd\r\n", SHRT_MIN);
     result_file = mbed_fprintf(stderr, "hd: %hd\r\n", SHRT_MIN);
-    result_baseline = printf("hd: %hd\r\n", SHRT_MIN);
+    result_baseline = make_test_string("hd: ", SHRT_MIN, BASE_10, "\r\n", true);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
 
     result_minimal = mbed_printf("hd: %hd\r\n", SHRT_MAX);
     result_file = mbed_fprintf(stderr, "hd: %hd\r\n", SHRT_MAX);
-    result_baseline = printf("hd: %hd\r\n", SHRT_MAX);
+    result_baseline = make_test_string("hd: ", SHRT_MAX, BASE_10, "\r\n");
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
 
     result_minimal = mbed_printf("d: %d\r\n", INT_MIN);
     result_file = mbed_fprintf(stderr, "d: %d\r\n", INT_MIN);
-    result_baseline = printf("d: %d\r\n", INT_MIN);
+    result_baseline = make_test_string("d: ", INT_MIN, BASE_10, "\r\n", true);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
 
     result_minimal = mbed_printf("d: %d\r\n", INT_MAX);
     result_file = mbed_fprintf(stderr, "d: %d\r\n", INT_MAX);
-    result_baseline = printf("d: %d\r\n", INT_MAX);
+    result_baseline = make_test_string("d: ", INT_MAX, BASE_10, "\r\n");
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
 
     result_minimal = mbed_printf("ld: %ld\r\n", LONG_MIN);
     result_file = mbed_fprintf(stderr, "ld: %ld\r\n", LONG_MIN);
-    result_baseline = printf("ld: %ld\r\n", LONG_MIN);
+    result_baseline = make_test_string("ld: ", LONG_MIN, BASE_10, "\r\n", true);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
 
     result_minimal = mbed_printf("ld: %ld\r\n", LONG_MAX);
     result_file = mbed_fprintf(stderr, "ld: %ld\r\n", LONG_MAX);
-    result_baseline = printf("ld: %ld\r\n", LONG_MAX);
+    result_baseline = make_test_string("ld: ", LONG_MAX, BASE_10, "\r\n");
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
 
     result_minimal = mbed_printf("lld: %lld\r\n", LLONG_MIN);
     result_file = mbed_fprintf(stderr, "lld: %lld\r\n", LLONG_MIN);
-#if !defined(__NEWLIB_NANO)
-    // The format specifier %lld is not supported by Newlib-Nano
-    result_baseline = printf("lld: %lld\r\n", LLONG_MIN);
-#else
-    result_baseline = calculate_str_len("lld: ", LLONG_MIN, BASE_10, "\r\n", true);
-#endif
+    result_baseline = make_test_string("lld: ", LLONG_MIN, BASE_10, "\r\n", true);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
 
     result_minimal = mbed_printf("lld: %lld\r\n", LLONG_MAX);
     result_file = mbed_fprintf(stderr, "lld: %lld\r\n", LLONG_MAX);
-#if !defined(__NEWLIB_NANO)
-    // The format specifier %lld is not supported by Newlib-Nano
-    result_baseline = printf("lld: %lld\r\n", LLONG_MAX);
-#else
-    result_baseline = calculate_str_len("lld: ", LLONG_MAX, BASE_10, "\r\n");
-#endif
+    result_baseline = make_test_string("lld: ", LLONG_MAX, BASE_10, "\r\n");
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
 
@@ -221,13 +226,13 @@ static control_t test_printf_d(const size_t call_count)
 #else
     result_minimal = mbed_printf("jd: %jd\r\n", INT32_MIN);
     result_file = mbed_fprintf(stderr, "jd: %jd\r\n", INT32_MIN);
-    result_baseline = printf("jd: %jd\r\n", (intmax_t) INT32_MIN);
+    result_baseline = make_test_string("jd: ", (intmax_t) INT32_MIN, BASE_10, "\r\n", true);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
 
     result_minimal = mbed_printf("jd: %jd\r\n", INT32_MAX);
     result_file = mbed_fprintf(stderr, "jd: %jd\r\n", INT32_MAX);
-    result_baseline = printf("jd: %jd\r\n", (intmax_t) INT32_MAX);
+    result_baseline = make_test_string("jd: ", (intmax_t) INT32_MAX, BASE_10, "\r\n");
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
 #endif
@@ -237,13 +242,13 @@ static control_t test_printf_d(const size_t call_count)
 #else
     result_minimal = mbed_printf("zd: %zd\r\n", INT32_MIN);
     result_file = mbed_fprintf(stderr, "zd: %zd\r\n", INT32_MIN);
-    result_baseline = printf("zd: %zd\r\n", (ssize_t) INT32_MIN);
+    result_baseline = make_test_string("zd: ", (ssize_t) INT32_MIN, BASE_10, "\r\n", true);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
 
     result_minimal = mbed_printf("zd: %zd\r\n", INT32_MAX);
     result_file = mbed_fprintf(stderr, "zd: %zd\r\n", INT32_MAX);
-    result_baseline = printf("zd: %zd\r\n", (ssize_t) INT32_MAX);
+    result_baseline = make_test_string("zd: ", (ssize_t) INT32_MAX, BASE_10, "\r\n");
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
 #endif
@@ -253,13 +258,13 @@ static control_t test_printf_d(const size_t call_count)
 #else
     result_minimal = mbed_printf("td: %td\r\n", PTRDIFF_MIN);
     result_file = mbed_fprintf(stderr, "td: %td\r\n", PTRDIFF_MIN);
-    result_baseline = printf("td: %td\r\n", PTRDIFF_MIN);
+    result_baseline = make_test_string("td: ", PTRDIFF_MIN, BASE_10, "\r\n", true);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
 
     result_minimal = mbed_printf("td: %td\r\n", PTRDIFF_MAX);
     result_file = mbed_fprintf(stderr, "td: %td\r\n", PTRDIFF_MAX);
-    result_baseline = printf("td: %td\r\n", PTRDIFF_MAX);
+    result_baseline = make_test_string("td: ", PTRDIFF_MAX, BASE_10, "\r\n");
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
 #endif
@@ -277,81 +282,61 @@ static control_t test_printf_u(const size_t call_count)
     /*************************************************************************/
     result_minimal = mbed_printf("hhu: %hhu\r\n", 0);
     result_file = mbed_fprintf(stderr, "hhu: %hhu\r\n", 0);
-#if !defined(__NEWLIB_NANO)
-    // The format specifier %hhu is not supported by Newlib-Nano
-    result_baseline = printf("hhu: %hhu\r\n", 0);
-#else
-    result_baseline = calculate_str_len("hhu: ", 0, BASE_10, "\r\n");
-#endif
+    result_baseline = make_test_string("hhu: ", 0, BASE_10, "\r\n");
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
 
     result_minimal = mbed_printf("hhu: %hhu\r\n", UCHAR_MAX);
     result_file = mbed_fprintf(stderr, "hhu: %hhu\r\n", UCHAR_MAX);
-#if !defined(__NEWLIB_NANO)
-    // The format specifier %hhu is not supported by Newlib-Nano
-    result_baseline = printf("hhu: %hhu\r\n", UCHAR_MAX);
-#else
-    result_baseline = calculate_str_len("hhu: ", UCHAR_MAX, BASE_10, "\r\n");
-#endif
+    result_baseline = make_test_string("hhu: ", UCHAR_MAX, BASE_10, "\r\n");
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
 
     result_minimal = mbed_printf("hu: %hu\r\n", 0);
     result_file = mbed_fprintf(stderr, "hu: %hu\r\n", 0);
-    result_baseline = printf("hu: %hu\r\n", 0);
+    result_baseline = make_test_string("hu: ", 0, BASE_10, "\r\n");
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
 
     result_minimal = mbed_printf("hu: %hu\r\n", USHRT_MAX);
     result_file = mbed_fprintf(stderr, "hu: %hu\r\n", USHRT_MAX);
-    result_baseline = printf("hu: %hu\r\n", USHRT_MAX);
+    result_baseline = make_test_string("hu: ", USHRT_MAX, BASE_10, "\r\n");
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
 
     result_minimal = mbed_printf("u: %u\r\n", 0);
     result_file = mbed_fprintf(stderr, "u: %u\r\n", 0);
-    result_baseline = printf("u: %u\r\n", 0);
+    result_baseline = make_test_string("u: ", 0, BASE_10, "\r\n");
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
 
     result_minimal = mbed_printf("u: %u\r\n", UINT_MAX);
     result_file = mbed_fprintf(stderr, "u: %u\r\n", UINT_MAX);
-    result_baseline = printf("u: %u\r\n", UINT_MAX);
+    result_baseline = make_test_string("u: ", UINT_MAX, BASE_10, "\r\n");
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
 
     result_minimal = mbed_printf("lu: %lu\r\n", 0UL);
     result_file = mbed_fprintf(stderr, "lu: %lu\r\n", 0UL);
-    result_baseline = printf("lu: %lu\r\n", 0UL);
+    result_baseline = make_test_string("lu: ", 0UL, BASE_10, "\r\n");
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
 
     result_minimal = mbed_printf("lu: %lu\r\n", ULONG_MAX);
     result_file = mbed_fprintf(stderr, "lu: %lu\r\n", ULONG_MAX);
-    result_baseline = printf("lu: %lu\r\n", ULONG_MAX);
+    result_baseline = make_test_string("lu: ", ULONG_MAX, BASE_10, "\r\n");
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
 
     result_minimal = mbed_printf("llu: %llu\r\n", 0ULL);
     result_file = mbed_fprintf(stderr, "llu: %llu\r\n", 0ULL);
-#if !defined(__NEWLIB_NANO)
-    // The format specifier %llu is not supported by Newlib-Nano
-    result_baseline = printf("llu: %llu\r\n", 0ULL);
-#else
-    result_baseline = calculate_str_len("llu: ", 0ULL, BASE_10, "\r\n");
-#endif
+    result_baseline = make_test_string("llu: ", 0ULL, BASE_10, "\r\n");
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
 
     result_minimal = mbed_printf("llu: %llu\r\n", ULLONG_MAX);
     result_file = mbed_fprintf(stderr, "llu: %llu\r\n", ULLONG_MAX);
-#if !defined(__NEWLIB_NANO)
-    // The format specifier %llu is not supported by Newlib-Nano
-    result_baseline = printf("llu: %llu\r\n", ULLONG_MAX);
-#else
-    result_baseline = calculate_str_len("llu: ", ULLONG_MAX, BASE_10, "\r\n");
-#endif
+    result_baseline = make_test_string("llu: ", ULLONG_MAX, BASE_10, "\r\n");
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
 
@@ -360,13 +345,13 @@ static control_t test_printf_u(const size_t call_count)
 #else
     result_minimal = mbed_printf("ju: %ju\r\n", (uintmax_t) 0);
     result_file = mbed_fprintf(stderr, "ju: %ju\r\n", (uintmax_t) 0);
-    result_baseline = printf("ju: %ju\r\n", (uintmax_t) 0);
+    result_baseline = make_test_string("ju: ", (uintmax_t) 0, BASE_10, "\r\n");
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
 
     result_minimal = mbed_printf("ju: %ju\r\n", UINTMAX_MAX);
     result_file = mbed_fprintf(stderr, "ju: %ju\r\n", UINTMAX_MAX);
-    result_baseline = printf("ju: %ju\r\n", UINTMAX_MAX);
+    result_baseline = make_test_string("ju: ", UINTMAX_MAX, BASE_10, "\r\n");
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
 #endif
@@ -376,13 +361,13 @@ static control_t test_printf_u(const size_t call_count)
 #else
     result_minimal = mbed_printf("zu: %zu\r\n", 0);
     result_file = mbed_fprintf(stderr, "zu: %zu\r\n", 0);
-    result_baseline = printf("zu: %zu\r\n", 0);
+    result_baseline = make_test_string("zu: ", 0, BASE_10, "\r\n");
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
 
     result_minimal = mbed_printf("zu: %zu\r\n", SIZE_MAX);
     result_file = mbed_fprintf(stderr, "zu: %zu\r\n", SIZE_MAX);
-    result_baseline = printf("zu: %zu\r\n", SIZE_MAX);
+    result_baseline = make_test_string("zu: ", SIZE_MAX, BASE_10, "\r\n");
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
 #endif
@@ -392,13 +377,13 @@ static control_t test_printf_u(const size_t call_count)
 #else
     result_minimal = mbed_printf("tu: %tu\r\n", 0);
     result_file = mbed_fprintf(stderr, "tu: %tu\r\n", 0);
-    result_baseline = printf("tu: %tu\r\n", 0);
+    result_baseline = make_test_string("tu: ", 0, BASE_10, "\r\n");
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
 
     result_minimal = mbed_printf("tu: %tu\r\n", UINTPTR_MAX);
     result_file = mbed_fprintf(stderr, "tu: %tu\r\n", UINTPTR_MAX);
-    result_baseline = printf("tu: %tu\r\n", UINTPTR_MAX);
+    result_baseline = make_test_string("tu: ", UINTPTR_MAX, BASE_10, "\r\n");
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
 #endif
@@ -416,81 +401,61 @@ static control_t test_printf_x(const size_t call_count)
     /*************************************************************************/
     result_minimal = mbed_printf("hhX: %hhX\r\n", 0);
     result_file = mbed_fprintf(stderr, "hhX: %hhX\r\n", 0);
-#if !defined(__NEWLIB_NANO)
-    // The format specifier %hhX is not supported by Newlib-Nano
-    result_baseline = printf("hhX: %hhX\r\n", 0);
-#else
-    result_baseline = calculate_str_len("hhX: ", 0, BASE_16, "\r\n");
-#endif
+    result_baseline = make_test_string("hhX: ", 0, BASE_16, "\r\n");
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
 
     result_minimal = mbed_printf("hhX: %hhX\r\n", UCHAR_MAX);
     result_file = mbed_fprintf(stderr, "hhX: %hhX\r\n", UCHAR_MAX);
-#if !defined(__NEWLIB_NANO)
-    // The format specifier %hhX is not supported by Newlib-Nano
-    result_baseline = printf("hhX: %hhX\r\n", UCHAR_MAX);
-#else
-    result_baseline = calculate_str_len("hhX: ", UCHAR_MAX, BASE_16, "\r\n");
-#endif
+    result_baseline = make_test_string("hhX: ", UCHAR_MAX, BASE_16, "\r\n");
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
 
     result_minimal = mbed_printf("hX: %hX\r\n", 0);
     result_file = mbed_fprintf(stderr, "hX: %hX\r\n", 0);
-    result_baseline = printf("hX: %hX\r\n", 0);
+    result_baseline = make_test_string("hX: ", 0, BASE_16, "\r\n");
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
 
     result_minimal = mbed_printf("hX: %hX\r\n", USHRT_MAX);
     result_file = mbed_fprintf(stderr, "hX: %hX\r\n", USHRT_MAX);
-    result_baseline = printf("hX: %hX\r\n", USHRT_MAX);
+    result_baseline = make_test_string("hX: ", USHRT_MAX, BASE_16, "\r\n");
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
 
     result_minimal = mbed_printf("X: %X\r\n", 0);
     result_file = mbed_fprintf(stderr, "X: %X\r\n", 0);
-    result_baseline = printf("X: %X\r\n", 0);
+    result_baseline = make_test_string("X: ", 0, BASE_16, "\r\n");
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
 
     result_minimal = mbed_printf("X: %X\r\n", UINT_MAX);
     result_file = mbed_fprintf(stderr, "X: %X\r\n", UINT_MAX);
-    result_baseline = printf("X: %X\r\n", UINT_MAX);
+    result_baseline = make_test_string("X: ", UINT_MAX, BASE_16, "\r\n");
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
 
     result_minimal = mbed_printf("lX: %lX\r\n", 0UL);
     result_file = mbed_fprintf(stderr, "lX: %lX\r\n", 0UL);
-    result_baseline = printf("lX: %lX\r\n", 0UL);
+    result_baseline = make_test_string("lX: ", 0UL, BASE_16, "\r\n");
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
 
     result_minimal = mbed_printf("lX: %lX\r\n", ULONG_MAX);
     result_file = mbed_fprintf(stderr, "lX: %lX\r\n", ULONG_MAX);
-    result_baseline = printf("lX: %lX\r\n", ULONG_MAX);
+    result_baseline = make_test_string("lX: ", ULONG_MAX, BASE_16, "\r\n");
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
 
     result_minimal = mbed_printf("llX: %llX\r\n", 0ULL);
     result_file = mbed_fprintf(stderr, "llX: %llX\r\n", 0ULL);
-#if !defined(__NEWLIB_NANO)
-    // The format specifier %llX is not supported by Newlib-Nano
-    result_baseline = printf("llX: %llX\r\n", 0ULL);
-#else
-    result_baseline = calculate_str_len("llX: ", 0ULL, BASE_16, "\r\n");
-#endif
+    result_baseline = make_test_string("llX: ", 0ULL, BASE_16, "\r\n");
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
 
     result_minimal = mbed_printf("llX: %llX\r\n", ULLONG_MAX);
     result_file = mbed_fprintf(stderr, "llX: %llX\r\n", ULLONG_MAX);
-#if !defined(__NEWLIB_NANO)
-    // The format specifier %llX is not supported by Newlib-Nano
-    result_baseline = printf("llX: %llX\r\n", ULLONG_MAX);
-#else
-    result_baseline = calculate_str_len("llX: ", ULLONG_MAX, BASE_16, "\r\n");
-#endif
+    result_baseline = make_test_string("llX: ", ULLONG_MAX, BASE_16, "\r\n");
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
 
@@ -499,13 +464,13 @@ static control_t test_printf_x(const size_t call_count)
 #else
     result_minimal = mbed_printf("jX: %jX\r\n", (uintmax_t) 0);
     result_file = mbed_fprintf(stderr, "jX: %jX\r\n", (uintmax_t) 0);
-    result_baseline = printf("jX: %jX\r\n", (uintmax_t) 0);
+    result_baseline = make_test_string("jX: ", (uintmax_t) 0, BASE_16, "\r\n");
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
 
     result_minimal = mbed_printf("jX: %jX\r\n", UINTMAX_MAX);
     result_file = mbed_fprintf(stderr, "jX: %jX\r\n", UINTMAX_MAX);
-    result_baseline = printf("jX: %jX\r\n", UINTMAX_MAX);
+    result_baseline = make_test_string("jX: ", UINTMAX_MAX, BASE_16, "\r\n");
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
 #endif
@@ -515,13 +480,13 @@ static control_t test_printf_x(const size_t call_count)
 #else
     result_minimal = mbed_printf("zX: %zX\r\n", 0);
     result_file = mbed_fprintf(stderr, "zX: %zX\r\n", 0);
-    result_baseline = printf("zX: %zX\r\n", 0);
+    result_baseline = make_test_string("zX: ", 0, BASE_16, "\r\n");
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
 
     result_minimal = mbed_printf("zX: %zX\r\n", SIZE_MAX);
     result_file = mbed_fprintf(stderr, "zX: %zX\r\n", SIZE_MAX);
-    result_baseline = printf("zX: %zX\r\n", SIZE_MAX);
+    result_baseline = make_test_string("zX: ", SIZE_MAX, BASE_16, "\r\n");
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
 #endif
@@ -531,19 +496,19 @@ static control_t test_printf_x(const size_t call_count)
 #else
     result_minimal = mbed_printf("tX: %tX\r\n", 0);
     result_file = mbed_fprintf(stderr, "tX: %tX\r\n", 0);
-    result_baseline = printf("tX: %tX\r\n", 0);
+    result_baseline = make_test_string("tX: ", 0, BASE_16, "\r\n");
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
 
     result_minimal = mbed_printf("tX: %tX\r\n", UINTPTR_MAX);
     result_file = mbed_fprintf(stderr, "tX: %tX\r\n", UINTPTR_MAX);
-    result_baseline = printf("tX: %tX\r\n", UINTPTR_MAX);
+    result_baseline = make_test_string("tX: ", UINTPTR_MAX, BASE_16, "\r\n");
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
 #endif
 
     result_minimal = mbed_printf("x: %x\r\n", 11259375);
-    result_baseline = printf("x: %x\r\n", 11259375);
+    result_baseline = make_test_string("x: ", 11259375, BASE_16, "\r\n");
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 
     return CaseNext;
@@ -572,7 +537,6 @@ static control_t test_printf_percent(const size_t call_count)
 
 static control_t test_snprintf_d(const size_t call_count)
 {
-    char buffer_baseline[100];
     char buffer_minimal[100];
     int result_baseline;
     int result_minimal;
@@ -580,91 +544,66 @@ static control_t test_snprintf_d(const size_t call_count)
     /*************************************************************************/
     /*************************************************************************/
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "hhd: %hhd\r\n", SCHAR_MIN);
-#if !defined(__NEWLIB_NANO)
-    // The format specifier %hhd is not supported by Newlib-Nano
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "hhd: %hhd\r\n", SCHAR_MIN);
-    TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
-#else
-    result_baseline = calculate_str_len("hhd: ", SCHAR_MIN, BASE_10, "\r\n", true);
+    result_baseline = make_test_string("hhd: ", SCHAR_MIN, BASE_10, "\r\n", true);
     TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
-#endif
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "hhd: %hhd\r\n", SCHAR_MAX);
-#if !defined(__NEWLIB_NANO)
-    // The format specifier %hhd is not supported by Newlib-Nano
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "hhd: %hhd\r\n", SCHAR_MAX);
-    TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
-#else
-    result_baseline = calculate_str_len("hhd: ", SCHAR_MAX, BASE_10, "\r\n");
+    result_baseline = make_test_string("hhd: ", SCHAR_MAX, BASE_10, "\r\n");
     TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
-#endif
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "hd: %hd\r\n", SHRT_MIN);
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "hd: %hd\r\n", SHRT_MIN);
-    TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
+    result_baseline = make_test_string("hd: ", SHRT_MIN, BASE_10, "\r\n", true);
+    TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "hd: %hd\r\n", SHRT_MAX);
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "hd: %hd\r\n", SHRT_MAX);
-    TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
+    result_baseline = make_test_string("hd: ", SHRT_MAX, BASE_10, "\r\n");
+    TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "d: %d\r\n", INT_MIN);
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "d: %d\r\n", INT_MIN);
-    TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
+    result_baseline = make_test_string("d: ", INT_MIN, BASE_10, "\r\n", true);
+    TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "d: %d\r\n", INT_MAX);
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "d: %d\r\n", INT_MAX);
-    TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
+    result_baseline = make_test_string("d: ", INT_MAX, BASE_10, "\r\n");
+    TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "ld: %ld\r\n", LONG_MIN);
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "ld: %ld\r\n", LONG_MIN);
-    TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
+    result_baseline = make_test_string("ld: ", LONG_MIN, BASE_10, "\r\n", true);
+    TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "ld: %ld\r\n", LONG_MAX);
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "ld: %ld\r\n", LONG_MAX);
-    TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
+    result_baseline = make_test_string("ld: ", LONG_MAX, BASE_10, "\r\n");
+    TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "lld: %lld\r\n", LLONG_MIN);
-#if !defined(__NEWLIB_NANO)
-    // The format specifier %lld is not supported by Newlib-Nano
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "lld: %lld\r\n", LLONG_MIN);
-    TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
-#else
-    result_baseline = calculate_str_len("lld: ", LLONG_MIN, BASE_10, "\r\n", true);
+    result_baseline = make_test_string("lld: ", LLONG_MIN, BASE_10, "\r\n", true);
     TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
-#endif
-
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "lld: %lld\r\n", LLONG_MAX);
-#if !defined(__NEWLIB_NANO)
-    // The format specifier %lld is not supported by Newlib-Nano
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "lld: %lld\r\n", LLONG_MAX);
-    TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
-#else
-    result_baseline = calculate_str_len("lld: ", LLONG_MAX, BASE_10, "\r\n");
+    result_baseline = make_test_string("lld: ", LLONG_MAX, BASE_10, "\r\n");
     TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
-#endif
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 
 #ifdef TARGET_LIKE_MBED
     printf("%%jd not supported by mbed\r\n");
 #else
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "jd: %jd\r\n", (intmax_t) INT32_MIN);
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "jd: %jd\r\n", (intmax_t) INT32_MIN);
-    TEST_ASSERT_EQUAL_STRING("jd: -2147483648\r\n", buffer_minimal);
+    result_baseline = make_test_string("jd: ", (intmax_t) INT32_MIN, BASE_10, "\r\n", true);
+    TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "jd: %jd\r\n", (intmax_t) INT32_MAX);
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "jd: %jd\r\n", (intmax_t) INT32_MAX);
-    TEST_ASSERT_EQUAL_STRING("jd: 2147483647\r\n", buffer_minimal);
+    result_baseline = make_test_string("jd: ", (intmax_t) INT32_MAX, BASE_10, "\r\n");
+    TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 #endif
 
@@ -672,13 +611,13 @@ static control_t test_snprintf_d(const size_t call_count)
     printf("%%zd not supported by mbed\r\n");
 #else
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "zd: %zd\r\n", (ssize_t) INT32_MIN);
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "zd: %zd\r\n", (ssize_t) INT32_MIN);
-    TEST_ASSERT_EQUAL_STRING("zd: -2147483648\r\n", buffer_minimal);
+    result_baseline = make_test_string("zd: ", (ssize_t) INT32_MIN, BASE_10, "\r\n", true);
+    TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "zd: %zd\r\n", (ssize_t) INT32_MAX);
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "zd: %zd\r\n", (ssize_t) INT32_MAX);
-    TEST_ASSERT_EQUAL_STRING("zd: 2147483647\r\n", buffer_minimal);
+    result_baseline = make_test_string("zd: ", (ssize_t) INT32_MAX, BASE_10, "\r\n");
+    TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 #endif
 
@@ -686,13 +625,13 @@ static control_t test_snprintf_d(const size_t call_count)
     printf("%%td not supported by mbed\r\n");
 #else
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "td: %td\r\n", PTRDIFF_MIN);
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "td: %td\r\n", PTRDIFF_MIN);
-    TEST_ASSERT_EQUAL_STRING("td: -2147483648\r\n", buffer_minimal);
+    result_baseline = make_test_string("td: ", PTRDIFF_MIN, BASE_10, "\r\n", true);
+    TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "td: %td\r\n", PTRDIFF_MAX);
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "td: %td\r\n", PTRDIFF_MAX);
-    TEST_ASSERT_EQUAL_STRING("td: 2147483647\r\n", buffer_minimal);
+    result_baseline = make_test_string("td: ", PTRDIFF_MAX, BASE_10, "\r\n", true);
+    TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 #endif
 
@@ -701,7 +640,6 @@ static control_t test_snprintf_d(const size_t call_count)
 
 static control_t test_snprintf_u(const size_t call_count)
 {
-    char buffer_baseline[100];
     char buffer_minimal[100];
     int result_baseline;
     int result_minimal;
@@ -709,90 +647,66 @@ static control_t test_snprintf_u(const size_t call_count)
     /*************************************************************************/
     /*************************************************************************/
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "hhu: %hhu\r\n", 0);
-#if !defined(__NEWLIB_NANO)
-    // The format specifier %hhu is not supported by Newlib-Nano
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "hhu: %hhu\r\n", 0);
-    TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
-#else
-    result_baseline = calculate_str_len("hhu: ", 0, BASE_10, "\r\n");
+    result_baseline = make_test_string("hhu: ", 0, BASE_10, "\r\n");
     TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
-#endif
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "hhu: %hhu\r\n", UCHAR_MAX);
-#if !defined(__NEWLIB_NANO)
-    // The format specifier %hhu is not supported by Newlib-Nano
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "hhu: %hhu\r\n", UCHAR_MAX);
-    TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
-#else
-    result_baseline = calculate_str_len("hhu: ", UCHAR_MAX, BASE_10, "\r\n");
+    result_baseline = make_test_string("hhu: ", UCHAR_MAX, BASE_10, "\r\n");
     TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
-#endif
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "hu: %hu\r\n", 0);
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "hu: %hu\r\n", 0);
-    TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
+    result_baseline = make_test_string("hu: ", 0, BASE_10, "\r\n");
+    TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "hu: %hu\r\n", USHRT_MAX);
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "hu: %hu\r\n", USHRT_MAX);
-    TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
+    result_baseline = make_test_string("hu: ", USHRT_MAX, BASE_10, "\r\n");
+    TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "u: %u\r\n", 0);
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "u: %u\r\n", 0);
-    TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
+    result_baseline = make_test_string("u: ", 0, BASE_10, "\r\n");
+    TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "u: %u\r\n", UINT_MAX);
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "u: %u\r\n", UINT_MAX);
-    TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
+    result_baseline = make_test_string("u: ", UINT_MAX, BASE_10, "\r\n");
+    TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "lu: %lu\r\n", 0UL);
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "lu: %lu\r\n", 0UL);
-    TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
+    result_baseline = make_test_string("lu: ", 0UL, BASE_10, "\r\n");
+    TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "lu: %lu\r\n", ULONG_MAX);
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "lu: %lu\r\n", ULONG_MAX);
-    TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
+    result_baseline = make_test_string("lu: ", ULONG_MAX, BASE_10, "\r\n");
+    TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "llu: %llu\r\n", 0ULL);
-#if !defined(__NEWLIB_NANO)
-    // The format specifier %llu is not supported by Newlib-Nano
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "llu: %llu\r\n", 0ULL);
-    TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
-#else
-    result_baseline = calculate_str_len("llu: ", 0ULL, BASE_10, "\r\n");
+    result_baseline = make_test_string("llu: ", 0ULL, BASE_10, "\r\n");
     TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
-#endif
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "llu: %llu\r\n", ULLONG_MAX);
-#if !defined(__NEWLIB_NANO)
-    // The format specifier %llu is not supported by Newlib-Nano
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "llu: %llu\r\n", ULLONG_MAX);
-    TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
-#else
-    result_baseline = calculate_str_len("llu: ", ULLONG_MAX, BASE_10, "\r\n");
+    result_baseline = make_test_string("llu: ", ULLONG_MAX, BASE_10, "\r\n");
     TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
-#endif
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 
 #ifdef TARGET_LIKE_MBED
     printf("%%ju not supported by mbed\r\n");
 #else
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "ju: %ju\r\n", (uintmax_t) 0);
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "ju: %ju\r\n", (uintmax_t) 0);
-    TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
+    result_baseline = make_test_string("ju: ", (uintmax_t) 0, BASE_10, "\r\n");
+    TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "ju: %ju\r\n", UINTMAX_MAX);
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "ju: %ju\r\n", UINTMAX_MAX);
-    TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
+    result_baseline = make_test_string("ju: ", UINTMAX_MAX, BASE_10, "\r\n");
+    TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 #endif
 
@@ -800,13 +714,13 @@ static control_t test_snprintf_u(const size_t call_count)
     printf("%%zu not supported by mbed\r\n");
 #else
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "zu: %zu\r\n", 0);
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "zu: %zu\r\n", 0);
-    TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
+    result_baseline = make_test_string("zu: ", 0, BASE_10, "\r\n");
+    TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "zu: %zu\r\n", SIZE_MAX);
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "zu: %zu\r\n", SIZE_MAX);
-    TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
+    result_baseline = make_test_string("zu: ", SIZE_MAX, BASE_10, "\r\n");
+    TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 #endif
 
@@ -814,13 +728,13 @@ static control_t test_snprintf_u(const size_t call_count)
     printf("%%tu not supported by mbed\r\n");
 #else
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "tu: %tu\r\n", 0);
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "tu: %tu\r\n", 0);
-    TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
+    result_baseline = make_test_string("tu: ", 0, BASE_10, "\r\n");
+    TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "tu: %tu\r\n", UINTPTR_MAX);
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "tu: %tu\r\n", UINTPTR_MAX);
-    TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
+    result_baseline = make_test_string("tu: ", UINTPTR_MAX, BASE_10, "\r\n");
+    TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 #endif
 
@@ -829,7 +743,6 @@ static control_t test_snprintf_u(const size_t call_count)
 
 static control_t test_snprintf_x(const size_t call_count)
 {
-    char buffer_baseline[100];
     char buffer_minimal[100];
     int result_baseline;
     int result_minimal;
@@ -837,89 +750,65 @@ static control_t test_snprintf_x(const size_t call_count)
     /*************************************************************************/
     /*************************************************************************/
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "hhX: %hhX\r\n", 0);
-#if !defined(__NEWLIB_NANO)
-    // The format specifier %hhX is not supported by Newlib-Nano
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "hhX: %hhX\r\n", 0);
-    TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
-#else
-    result_baseline = calculate_str_len("hhX: ", 0, BASE_16, "\r\n");
+    result_baseline = make_test_string("hhX: ", 0, BASE_16, "\r\n");
     TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
-#endif
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "hhX: %hhX\r\n", UCHAR_MAX);
-#if !defined(__NEWLIB_NANO)
-    // The format specifier %hhX is not supported by Newlib-Nano
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "hhX: %hhX\r\n", UCHAR_MAX);
-    TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
-#else
-    result_baseline = calculate_str_len("hhX: ", UCHAR_MAX, BASE_16, "\r\n");
+    result_baseline = make_test_string("hhX: ", UCHAR_MAX, BASE_16, "\r\n");
     TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
-#endif
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "hX: %hX\r\n", 0);
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "hX: %hX\r\n", 0);
-    TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
+    result_baseline = make_test_string("hX: ", 0, BASE_16, "\r\n");
+    TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "hX: %hX\r\n", USHRT_MAX);
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "hX: %hX\r\n", USHRT_MAX);
+    result_baseline = make_test_string("hX: ", USHRT_MAX, BASE_16, "\r\n");
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "X: %X\r\n", 0);
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "X: %X\r\n", 0);
-    TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
+    result_baseline = make_test_string("X: ", 0, BASE_16, "\r\n");
+    TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "X: %X\r\n", UINT_MAX);
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "X: %X\r\n", UINT_MAX);
-    TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
+    result_baseline = make_test_string("X: ", UINT_MAX, BASE_16, "\r\n");
+    TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "lX: %lX\r\n", 0UL);
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "lX: %lX\r\n", 0UL);
-    TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
+    result_baseline = make_test_string("lX: ", 0UL, BASE_16, "\r\n");
+    TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "lX: %lX\r\n", ULONG_MAX);
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "lX: %lX\r\n", ULONG_MAX);
-    TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
+    result_baseline = make_test_string("lX: ", ULONG_MAX, BASE_16, "\r\n");
+    TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "llX: %llX\r\n", 0ULL);
-#if !defined(__NEWLIB_NANO)
-    // The format specifier %llX is not supported by Newlib-Nano
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "llX: %llX\r\n", 0ULL);
-    TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
-#else
-    result_baseline = calculate_str_len("llX: ", 0ULL, BASE_16, "\r\n");
+    result_baseline = make_test_string("llX: ", 0ULL, BASE_16, "\r\n");
     TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
-#endif
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "llX: %llX\r\n", ULLONG_MAX);
-#if !defined(__NEWLIB_NANO)
-    // The format specifier %llX is not supported by Newlib-Nano
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "llX: %llX\r\n", ULLONG_MAX);
-    TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
-#else
-    result_baseline = calculate_str_len("llX: ", ULLONG_MAX, BASE_16, "\r\n");
+    result_baseline = make_test_string("llX: ", ULLONG_MAX, BASE_16, "\r\n");
     TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
-#endif
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 
 #ifdef TARGET_LIKE_MBED
     printf("%%jX not supported by mbed\r\n");
 #else
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "jX: %jX\r\n", (uintmax_t) 0);
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "jX: %jX\r\n", (uintmax_t) 0);
-    TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
+    result_baseline = make_test_string("jX: ", (uintmax_t) 0, BASE_16, "\r\n");
+    TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "jX: %jX\r\n", UINTMAX_MAX);
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "jX: %jX\r\n", UINTMAX_MAX);
-    TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
+    result_baseline = make_test_string("jX: ", UINTMAX_MAX, BASE_16, "\r\n");
+    TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 #endif
 
@@ -927,13 +816,13 @@ static control_t test_snprintf_x(const size_t call_count)
     printf("%%xX not supported by mbed\r\n");
 #else
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "zX: %zX\r\n", 0);
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "zX: %zX\r\n", 0);
-    TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
+    result_baseline = make_test_string("zX: ", 0, BASE_16, "\r\n");
+    TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "zX: %zX\r\n", SIZE_MAX);
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "zX: %zX\r\n", SIZE_MAX);
-    TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
+    result_baseline = make_test_string("zX: ", SIZE_MAX, BASE_16, "\r\n");
+    TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 #endif
 
@@ -941,13 +830,13 @@ static control_t test_snprintf_x(const size_t call_count)
     printf("%%tX not supported by mbed\r\n");
 #else
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "tX: %tX\r\n", 0);
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "tX: %tX\r\n", 0);
-    TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
+    result_baseline = make_test_string("tX: ", 0, BASE_16, "\r\n");
+    TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "tX: %tX\r\n", UINTPTR_MAX);
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "tX: %tX\r\n", UINTPTR_MAX);
-    TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
+    result_baseline = make_test_string("tX: ", UINTPTR_MAX, BASE_16, "\r\n");
+    TEST_ASSERT_EQUAL_STRING(expected_string, buffer_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 #endif
 
@@ -1063,71 +952,46 @@ static control_t test_snprintf_f(const size_t call_count)
  * Template parameters:
     * 'T' is the type being tested
     * 'buf_size' is the buffer size used in tests
-    * 'base' is used when Newlib-nano non-supported printf formats to calculate calculate_str_len
+    * 'base' is used to represent data in BASE_10 or BASE_16 numeral system
   * Function parameters:
     * 'fmt' is the format to use for sprintf
     * 'data' is the data that will be printed
-    * 'is_negative' boolenan true for negative number,false for positive number
+    * 'is_negative' is true for negative number,false for positive number
 */
-#if !defined(__NEWLIB_NANO)
-template<typename T, size_t buf_size>
-#else
 template<typename T, size_t buf_size, int base = BASE_10>
-#endif
 static control_t test_snprintf_buffer_overflow_generic(const char *fmt, T data, bool is_negative = false)
 {
     char buffer_baseline[buf_size];
     char buffer_minimal[buf_size];
     int result_baseline;
     int result_minimal;
-#if defined(__NEWLIB_NANO)
-    char prefix[buf_size];
-    memset(prefix, 0, buf_size);
+    char prefix[buf_size] = { 0 };
+    // fmt string contains "format specifier: %format specifier",
+    // for long long data type fmt will be "hhd: %hhd"
+    // and below function only extracts prefix "hhd: ".
     extract_prefix(fmt, &prefix[0]);
-    result_baseline = calculate_str_len(prefix, data, base, nullptr, is_negative);
-#endif
-    memset(buffer_baseline, 0, buf_size);
-#if !defined(__MICROLIB)
-    // Microlib snprintf always returns zero if the size
-    // to copy from the buffer is zero.
-    // See reported microlib bug SDCOMP-54710
+    result_baseline = make_test_string(prefix, data, base, nullptr, is_negative);
 
     /* empty buffer test */
     result_minimal = mbed_snprintf(buffer_minimal, 0, fmt, data);
-#if !defined(__NEWLIB_NANO)
-    result_baseline = snprintf(buffer_baseline, 0, fmt, data);
-#endif
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
-#endif
 
     /* buffer isn't large enough, output needs to be truncated */
     result_minimal = mbed_snprintf(buffer_minimal, buf_size - 2, fmt, data);
-#if !defined(__NEWLIB_NANO)
-    result_baseline = snprintf(buffer_baseline, buf_size - 2, fmt, data);
-#else
-    strncpy(buffer_baseline, expected_string, buf_size - 3);
-#endif
+    snprintf(buffer_baseline, buf_size - 2, "%s", expected_string);
     TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 
     /* buffer is one byte shorter than needed, string terminator must
        be written and output must be truncated */
     result_minimal = mbed_snprintf(buffer_minimal, buf_size - 1, fmt, data);
-#if !defined(__NEWLIB_NANO)
-    result_baseline = snprintf(buffer_baseline, buf_size - 1, fmt, data);
-#else
-    strncpy(buffer_baseline, expected_string, buf_size - 2);
-#endif
+    snprintf(buffer_baseline, buf_size - 1, "%s", expected_string);
     TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 
     /* buffer is just long enough */
     result_minimal = mbed_snprintf(buffer_minimal, buf_size, fmt, data);
-#if !defined(__NEWLIB_NANO)
-    result_baseline = snprintf(buffer_baseline, buf_size, fmt, data);
-#else
-    strncpy(buffer_baseline, expected_string, buf_size);
-#endif
+    snprintf(buffer_baseline, buf_size, "%s", expected_string);
     TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 
@@ -1169,29 +1033,17 @@ static control_t test_snprintf_buffer_overflow_llu(const size_t call_count)
 
 static control_t test_snprintf_buffer_overflow_x(const size_t call_count)
 {
-#if !defined(__NEWLIB_NANO)
-    return test_snprintf_buffer_overflow_generic<unsigned int, sizeof("x: 0x400")>("x: 0x%x", 0x400);
-#else
     return test_snprintf_buffer_overflow_generic<unsigned int, sizeof("x: 0x400"), BASE_16>("x: 0x%x", 0x400);
-#endif
 }
 
 static control_t test_snprintf_buffer_overflow_lx(const size_t call_count)
 {
-#if !defined(__NEWLIB_NANO)
-    return test_snprintf_buffer_overflow_generic<unsigned long, sizeof("lx: 0x100000")>("lx: 0x%lx", 0x100000UL);
-#else
     return test_snprintf_buffer_overflow_generic<unsigned long, sizeof("lx: 0x100000"), BASE_16>("lx: 0x%lx", 0x100000UL);
-#endif
 }
 
 static control_t test_snprintf_buffer_overflow_llx(const size_t call_count)
 {
-#if !defined(__NEWLIB_NANO)
-    return test_snprintf_buffer_overflow_generic<unsigned long long, sizeof("llx: 0x10000000000")>("llx: 0x%llx", 0x10000000000ULL);
-#else
     return test_snprintf_buffer_overflow_generic<unsigned long long, sizeof("llx: 0x10000000000"), BASE_16>("llx: 0x%llx", 0x10000000000ULL);
-#endif
 }
 
 utest::v1::status_t greentea_setup(const size_t number_of_cases)
