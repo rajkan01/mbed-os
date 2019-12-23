@@ -132,7 +132,7 @@ static int make_test_string(
         strncpy(exp_str, prefix, str_length);
     }
 
-    convert_to_string(value, &exp_str[str_length], base, is_negative);    
+    convert_to_string(value, &exp_str[str_length], base, is_negative);
     if (suffix) {
         str_length = strlen(exp_str);
         MBED_ASSERT(strlen(suffix) < (MAX_STRING_SIZE - str_length));
@@ -142,12 +142,12 @@ static int make_test_string(
 }
 
 // Extract the prefix string which is all characters until '%'.
-static void extract_prefix(const char *fmt, char *prefix = nullptr)
+static void extract_prefix(const char *fmt, char *prefix)
 {
     int i = 0;
     while (fmt && prefix && fmt[i] != '%') {
-            prefix[i] = fmt[i];
-            i++;
+        prefix[i] = fmt[i];
+        i++;
     }
 }
 
@@ -517,10 +517,11 @@ static control_t test_printf_percent(const size_t call_count)
     int result_baseline;
     int result_minimal;
     int result_file;
+    char buffer_baseline[100] = {0};
 
     result_minimal = mbed_printf("%% \r\n");
     result_file = mbed_fprintf(stderr, "%% \r\n");
-    result_baseline = printf("%% \r\n");
+    result_baseline = sprintf(buffer_baseline, "%% \r\n");
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_file);
 
@@ -849,7 +850,7 @@ static control_t test_snprintf_percent(const size_t call_count)
     int result_minimal;
 
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "%% \r\n");
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "%% \r\n");
+    result_baseline = sprintf(buffer_baseline, "%% \r\n");
     TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 
@@ -872,41 +873,47 @@ static control_t test_snprintf_unsupported_specifier(const size_t call_count)
 #if MBED_CONF_PLATFORM_MINIMAL_PRINTF_ENABLE_FLOATING_POINT
 static control_t test_printf_f(const size_t call_count)
 {
+    char buffer_baseline[100];
     int result_baseline;
     int result_minimal;
-
+#define CLEAN_BUFFER memset(buffer_baseline, 0x00, sizeof(buffer_baseline))
     /*************************************************************************/
     /*************************************************************************/
-
     double pi = 3.14159265359;
-
-
+    CLEAN_BUFFER;
     result_minimal = mbed_printf("f: %f\r\n", 3.0089);
-    result_baseline = printf("f: %f\r\n", 3.0089);
+    result_baseline = sprintf(buffer_baseline, "f: 3.008900\r\n");
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
-
+    CLEAN_BUFFER;
     result_minimal = mbed_printf("f: %f\r\n", 7.0);
-    result_baseline = printf("f: %f\r\n", 7.0);
+    result_baseline = sprintf(buffer_baseline, "f: 7.000000\r\n");
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
-
+    CLEAN_BUFFER;
     result_minimal = mbed_printf("f: %f\r\n", -1 * pi);
-    result_baseline = printf("f: %f\r\n", -1 * pi);
+    result_baseline = sprintf(buffer_baseline, "f: -3.141593\r\n");
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
-
+    CLEAN_BUFFER;
     result_minimal = mbed_printf("f: %f\r\n", 0.0);
-    result_baseline = printf("f: %f\r\n", 0.0);
+    result_baseline = sprintf(buffer_baseline, "f: 0.000000\r\n");
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
-
+    CLEAN_BUFFER;
     result_minimal = mbed_printf("f: %f\r\n", pi);
-    result_baseline = printf("f: %f\r\n", pi);
+    result_baseline = sprintf(buffer_baseline, "f: 3.141593\r\n");
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
-
+    CLEAN_BUFFER;
+    result_minimal = mbed_printf("f: %f\r\n", 2.12345651);
+    result_baseline = sprintf(buffer_baseline, "f: 2.123457\r\n");
+    TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
+    CLEAN_BUFFER;
+    result_minimal = mbed_printf("f: %f\r\n", 2.12345649);
+    result_baseline = sprintf(buffer_baseline, "f: 2.123456\r\n");
+    TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
     return CaseNext;
 }
 
 static control_t test_snprintf_f(const size_t call_count)
 {
-    char buffer_baseline[100];
+    char buffer_baseline[100] = {0};
     char buffer_minimal[100];
     int result_baseline;
     int result_minimal;
@@ -917,27 +924,27 @@ static control_t test_snprintf_f(const size_t call_count)
     double pi = 3.14159265359;
 
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "f: %f\r\n", 3.0089);
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "f: %f\r\n", 3.0089);
+    result_baseline = sprintf(buffer_baseline, "f: 3.008900\r\n");
     TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "f: %f\r\n", 7.0);
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "f: %f\r\n", 7.0);
+    result_baseline = sprintf(buffer_baseline, "f: 7.000000\r\n");
     TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "f: %f\r\n", -1 * pi);
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "f: %f\r\n", -1 * pi);
+    result_baseline = sprintf(buffer_baseline, "f: -3.141593\r\n");
     TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "f: %f\r\n", 0.0);
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "f: %f\r\n", 0.0);
+    result_baseline = sprintf(buffer_baseline, "f: 0.000000\r\n");
     TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 
     result_minimal = mbed_snprintf(buffer_minimal, sizeof(buffer_minimal), "f: %f\r\n", pi);
-    result_baseline = snprintf(buffer_baseline, sizeof(buffer_baseline), "f: %f\r\n", pi);
+    result_baseline = sprintf(buffer_baseline, "f: 3.141593\r\n");
     TEST_ASSERT_EQUAL_STRING(buffer_baseline, buffer_minimal);
     TEST_ASSERT_EQUAL_INT(result_baseline, result_minimal);
 
@@ -964,8 +971,8 @@ static control_t test_snprintf_buffer_overflow_generic(const char *fmt, T data, 
     int result_baseline;
     int result_minimal;
     char prefix[buf_size] = { 0 };
-    // fmt string has "format specifier: %format specifier" and
-    // this function extracts the string preceding the first '%'.
+    // fmt string has "format specifier: %format specifier"
+    // Extract the string preceding the first '%' from fmt.
     extract_prefix(fmt, &prefix[0]);
     result_baseline = make_test_string(prefix, data, base, nullptr, is_negative);
 
