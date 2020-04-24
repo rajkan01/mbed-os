@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+#if defined(MBED_CONF_RTOS_PRESENT)
 #ifndef USBCDC_ECM_H
 #define USBCDC_ECM_H
 
@@ -276,4 +276,5 @@ private:
 
 /** @}*/
 
+#endif // defined(MBED_CONF_RTOS_PRESENT)
 #endif
