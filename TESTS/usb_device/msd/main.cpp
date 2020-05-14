@@ -19,9 +19,6 @@
 #error [NOT_SUPPORTED] usb device tests not enabled
 #else
 
-#if !defined(MBED_CONF_RTOS_PRESENT)
-#error [NOT_SUPPORTED] USB stack and test cases require RTOS to run.
-#else
 
 #include <stdio.h>
 #include <string.h>
@@ -216,6 +213,7 @@ void run_processing(Semaphore *sem)
     sem->release();
 }
 
+#if defined(MBED_CONF_RTOS_PRESENT)
 void msd_process(USBMSD *msd)
 {
     Semaphore proc;
@@ -229,7 +227,17 @@ void msd_process(USBMSD *msd)
     }
     msd->attach(NULL);
 }
-
+#else
+void msd_ticker(USBMSD *msd, Semaphore *proc)
+{
+    if (proc->try_acquire()) {
+        msd->process();
+        if (msd->media_removed()) {
+            media_remove_event.release();
+        }
+    }
+}
+#endif
 
 // wait until msd negotiation is done (no r/w disk operation for at least 1s)
 // max wait time is 15s
@@ -237,7 +245,7 @@ void msd_process(USBMSD *msd)
     for (int x = 0; x < 15; x++) { \
         prev_read_counter = usb.get_read_counter();\
         prev_program_counter = usb.get_program_counter();\
-        ThisThread::sleep_for(1000);\
+        ThisThread::sleep_for(1s);\
         if ((usb.get_read_counter() == prev_read_counter) && \
             (usb.get_program_counter() == prev_program_counter)) {\
             break;\
@@ -291,10 +299,17 @@ void storage_init()
 template <uint32_t N>
 void mount_unmount_test(BlockDevice *bd, FileSystem *fs)
 {
-    Thread msd_thread(osPriorityHigh);
     TestUSBMSD usb(bd, false);
+#if defined(MBED_CONF_RTOS_PRESENT)
     msd_process_done = false;
+    Thread msd_thread(osPriorityHigh);
     msd_thread.start(callback(msd_process, &usb));
+#else
+    Semaphore proc;
+    usb.attach(callback(run_processing, &proc));
+    Ticker t;
+    t.attach([&] {msd_ticker(&usb, &proc); }, 50us);
+#endif
 
     for (uint32_t i = 1; i <= N; i++) {
         // mount
@@ -379,8 +394,12 @@ void mount_unmount_test(BlockDevice *bd, FileSystem *fs)
     greentea_parse_kv(_key, _value, sizeof(_key), sizeof(_value));
     TEST_ASSERT_EQUAL_STRING("passed", _key);
 
+#if defined(MBED_CONF_RTOS_PRESENT)
     msd_process_done = true; // terminate msd_thread
     msd_thread.join();
+#else
+    t.detach();
+#endif
 }
 
 /** Test mass storage device mount and unmount together with underlying file system operations
@@ -398,10 +417,17 @@ void mount_unmount_test(BlockDevice *bd, FileSystem *fs)
 void mount_unmount_and_data_test(BlockDevice *bd, FileSystem *fs)
 {
     const char *fs_root = fs->getName();
-    Thread msd_thread(osPriorityHigh);
     TestUSBMSD usb(bd, false);
+#if defined(MBED_CONF_RTOS_PRESENT)
     msd_process_done = false;
+    Thread msd_thread(osPriorityHigh);
     msd_thread.start(callback(msd_process, &usb));
+#else
+    Semaphore proc;
+    usb.attach(callback(run_processing, &proc));
+    Ticker t;
+    t.attach([&] {msd_ticker(&usb, &proc); }, 50us);
+#endif
 
     // mount
     usb.connect();
@@ -440,7 +466,7 @@ void mount_unmount_and_data_test(BlockDevice *bd, FileSystem *fs)
     TEST_ASSERT_EQUAL_STRING("passed", _key);
 
     do {
-        ThisThread::sleep_for(1);
+        ThisThread::sleep_for(1ms);
     } while (test_files_exist(fs_root));
     TEST_ASSERT_EQUAL(false, test_files_exist(fs_root));
 
@@ -450,8 +476,12 @@ void mount_unmount_and_data_test(BlockDevice *bd, FileSystem *fs)
     greentea_parse_kv(_key, _value, sizeof(_key), sizeof(_value));
     TEST_ASSERT_EQUAL_STRING("passed", _key);
 
+#if defined(MBED_CONF_RTOS_PRESENT)
     msd_process_done = true;    // terminate msd_thread
     msd_thread.join();
+#else
+    t.detach();
+#endif
     test_files_remove(fs_root);
 }
 
@@ -491,5 +521,4 @@ int main()
 }
 
 #endif // !defined(DEVICE_USBDEVICE) || !DEVICE_USBDEVICE
-#endif // !defined(MBED_CONF_RTOS_PRESENT)
 #endif // !defined(USB_DEVICE_TESTS)
