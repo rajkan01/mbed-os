@@ -12,14 +12,19 @@ target_include_directories(mbed-core
 
 target_sources(mbed-core
     PRIVATE
-        source/ConditionVariable.cpp
         source/EventFlags.cpp
         source/Kernel.cpp
         source/Mutex.cpp
         source/Semaphore.cpp
         source/ThisThread.cpp
-        source/Thread.cpp
 )
+if(NOT ${MBED_BAREMETAL_PROFILE})
+    target_sources(mbed-os
+        PRIVATE
+            source/ConditionVariable.cpp
+            source/Thread.cpp
+    )
+endif()
 
 target_compile_definitions(mbed-core
     PUBLIC

@@ -17,6 +17,7 @@ add_library(mbed-core OBJECT)
 # TODO CMAKE: Replace mbed-os by a new one that will include mbed-core and mbed-rtos
 add_library(mbed-os ALIAS mbed-core)
 
+
 # Validate selected C library type
 # The C library type selected has to match the library that the target can support
 if(${MBED_C_LIB} STREQUAL "small")
@@ -69,10 +70,12 @@ target_include_directories(mbed-core
         ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-# TODO CMake: This component is made visible here so its source files in
-# drivers/ can be added and it can be linked against by libraries in storage/.
-# Should the source files be moved from drivers/ to storage/ ?
+# These targets are made visible here so their source files which
+# are spread in different directories can be referenced and can be linked against
+# by libraries that depend on them.
+# TODO CMake: Should the source files be moved?
 add_library(mbed-device_key INTERFACE)
+add_library(mbed-rtos INTERFACE)
 
 add_subdirectory(cmsis)
 add_subdirectory(drivers)
@@ -80,6 +83,14 @@ add_subdirectory(hal)
 add_subdirectory(platform)
 add_subdirectory(rtos)
 add_subdirectory(targets)
+
+# Verify that the selected application OS profile is supported by the Mbed target
+#if(NOT MBED_CONF_RTOS_PRESENT)
+#     if(NOT "bare-metal" IN_LIST MBED_TARGET_SUPPORTED_APPLICATION_PROFILES)
+#         message(FATAL_ERROR
+#             "Baremetal profile is not supported for this target")
+#     endif()
+#endif()
 
 # The directories below contain optional target libraries
 add_subdirectory(events EXCLUDE_FROM_ALL)
@@ -89,6 +100,8 @@ add_subdirectory(drivers/device_key EXCLUDE_FROM_ALL)
 add_subdirectory(drivers/source/usb EXCLUDE_FROM_ALL)
 add_subdirectory(features EXCLUDE_FROM_ALL)
 add_subdirectory(platform/FEATURE_EXPERIMENTAL_API EXCLUDE_FROM_ALL)
+add_subdirectory(cmsis/CMSIS_5/CMSIS/RTOS2 EXCLUDE_FROM_ALL)
+add_subdirectory(cmsis/device/rtos EXCLUDE_FROM_ALL)
 
 #
 # Configures the application
