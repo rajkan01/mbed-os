@@ -21,7 +21,7 @@ target_sources(mbed-storage-kvstore
 )
 
 target_link_libraries(mbed-storage-kvstore
-    INTERFACE
+    INTERFACE        
         mbed-device_key
         mbed-storage-blockdevice
         mbed-storage-filesystem

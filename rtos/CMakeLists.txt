@@ -18,8 +18,8 @@ target_sources(mbed-core
         source/Semaphore.cpp
         source/ThisThread.cpp
 )
-if(NOT ${MBED_BAREMETAL_PROFILE})
-    target_sources(mbed-os
+if(${MBED_CONF_RTOS_PRESENT})
+    target_sources(mbed-core
         PRIVATE
             source/ConditionVariable.cpp
             source/Thread.cpp

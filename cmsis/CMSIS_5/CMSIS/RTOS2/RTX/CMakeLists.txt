@@ -22,7 +22,7 @@ function(_mbed_get_cortex_m_exception_handlers toolchain_dir)
         endif()
 
         target_sources(mbed-rtos
-            PRIVATE
+            INTERFACE
                 Source/${toolchain_dir}/${STARTUP_RTX_FILE}
         )
     endforeach()
@@ -31,7 +31,7 @@ endfunction()
 function(_mbed_get_cortex_a_exception_handlers)
     foreach(key ${MBED_TARGET_LABELS})
         if(${key} STREQUAL CORTEX_A)
-            target_sources(mbed-rtos PRIVATE Config/TARGET_CORTEX_A/handlers.c)
+            target_sources(mbed-rtos INTERFACE Config/TARGET_CORTEX_A/handlers.c)
         endif()
     endforeach()
 endfunction()
@@ -47,7 +47,7 @@ elseif(${MBED_TOOLCHAIN} STREQUAL "IAR")
 endif()
 
 target_include_directories(mbed-rtos
-    PUBLIC
+    INTERFACE
         Config
         Include
         Include1
@@ -55,7 +55,7 @@ target_include_directories(mbed-rtos
 )
 
 target_sources(mbed-rtos
-    PRIVATE
+    INTERFACE
         Config/RTX_Config.c
 
         Library/cmsis_os1.c
