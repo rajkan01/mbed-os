@@ -1,0 +1,21 @@
+{
+  "builds": {
+    "DISCO_L475VG_IOT01A-GCC_ARM": {
+      "platform": "DISCO_L475VG_IOT01A",
+      "toolchain": "GCC_ARM",
+      "base_path": "",
+      "baud_rate": 9600,
+      "binary_type": "bootable",
+      "tests": {
+        "echo": {
+          "binaries": [
+            {
+              "path": "build/mbed-drivers-greentea-test.bin"
+            }
+          ]
+        }
+      },
+      "test_apps": {}
+    }
+  }
+}
