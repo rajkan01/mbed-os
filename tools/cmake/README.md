@@ -96,7 +96,20 @@ $ mbedtools configure -t <TOOLCHAIN> -m <MBED_TARGET>
   ```
   touch mbed-os.lib && mkdir cmake_build && cd cmake_build && cmake .. -G Ninja -DMBED_BAREMETAL_GREENTEA_TEST=ON && cmake --build .
   ```
-
 Notes:
 * These steps will change when `mbedtools` implements a sub-command to invoke Greentea tests
 * Some Greentea tests require specific application configuration files in order to build and run successfully. For example, the `connectivity/mbedtls/tests/TESTS/mbedtls/sanity` test requires the configuration file found at `TESTs/configs/experimental.json`.
+
+## How to build and run a unit test
+
+Install prerequisites suggested in the previous section and follow the below steps:
+* Run the following command to build the unit test from mbed-os root directory:
+  ```
+  mkdir cmake_build && cmake -GNinja -DCMAKE_UNIT_TESTING=1 -B cmake_build && cmake --build cmake_build
+  ```
+  Note: Cmake `CMAKE_UNIT_TESTING` command line option is added in `mbed-os/CMakeLists.txt` to select unittest build
+
+* Run the following command to run the test using CTest:
+  ```
+  cd cmake_build/UNITTESTS && /usr/local/bin/ctest --force-new-ctest-process -V -D ExperimentalTest
+  ```

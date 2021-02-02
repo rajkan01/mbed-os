@@ -5,6 +5,11 @@
 
 cmake_minimum_required(VERSION 3.19.0 FATAL_ERROR)
 
+if(${CMAKE_UNIT_TESTING})
+    set(PROJECT_NAME unittests)    
+    project(${PROJECT_NAME})
+    add_subdirectory(UNITTESTS)
+else()
 include(${MBED_CONFIG_PATH}/mbed_config.cmake)
 
 add_library(mbed-core INTERFACE)
@@ -244,4 +249,5 @@ if ("${CMAKE_GENERATOR}" MATCHES "Ninja")
     if(NOT (CMAKE_HOST_SYSTEM_NAME MATCHES "Windows" AND CMAKE_CXX_COMPILER_ID MATCHES "ARMClang"))
         set(CMAKE_NINJA_FORCE_RESPONSE_FILE 1 CACHE INTERNAL "")
     endif()
+endif()
 endif()
